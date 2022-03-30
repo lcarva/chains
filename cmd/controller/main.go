@@ -16,6 +16,7 @@ package main
 import (
 	"flag"
 
+	"github.com/tektoncd/chains/pkg/reconciler/pipelinerun"
 	"github.com/tektoncd/chains/pkg/reconciler/taskrun"
 	"knative.dev/pkg/injection"
 	"knative.dev/pkg/injection/sharedmain"
@@ -34,5 +35,5 @@ func main() {
 	flag.Parse()
 	ctx := injection.WithNamespaceScope(signals.NewContext(), *namespace)
 
-	sharedmain.MainWithContext(ctx, "watcher", taskrun.NewController)
+	sharedmain.MainWithContext(ctx, "watcher", taskrun.NewController, pipelinerun.NewController)
 }

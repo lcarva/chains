@@ -26,7 +26,12 @@ import (
 )
 
 type Signable interface {
+	// TODO: We may want to consider refactoring ExtractObjects to take interface{}, or
+	// some generic k8s type that contians the metadata attribute, for example. It does
+	// not make sense for the TaskRunArtifact to implement ExtractObjectsFromPipelineRun
+	// just to comply with this interface.
 	ExtractObjects(tr *v1beta1.TaskRun) []interface{}
+	ExtractObjectsFromPipelineRun(tr *v1beta1.PipelineRun) []interface{}
 	StorageBackend(cfg config.Config) sets.String
 	Signer(cfg config.Config) string
 	PayloadFormat(cfg config.Config) formats.PayloadType
@@ -47,6 +52,11 @@ func (ta *TaskRunArtifact) Key(obj interface{}) string {
 func (ta *TaskRunArtifact) ExtractObjects(tr *v1beta1.TaskRun) []interface{} {
 	return []interface{}{tr}
 }
+
+func (ta *TaskRunArtifact) ExtractObjectsFromPipelineRun(pr *v1beta1.PipelineRun) []interface{} {
+	return make([]interface{}, 0)
+}
+
 func (ta *TaskRunArtifact) Type() string {
 	return "tekton"
 }
@@ -65,6 +75,44 @@ func (ta *TaskRunArtifact) Signer(cfg config.Config) string {
 
 func (ta *TaskRunArtifact) Enabled(cfg config.Config) bool {
 	return cfg.Artifacts.TaskRuns.Enabled()
+}
+
+type PipelineRunArtifact struct {
+	Logger *zap.SugaredLogger
+}
+
+func (pa *PipelineRunArtifact) Key(obj interface{}) string {
+	pr := obj.(*v1beta1.PipelineRun)
+	return "pipelinerun-" + string(pr.UID)
+}
+
+func (pa *PipelineRunArtifact) ExtractObjects(tr *v1beta1.TaskRun) []interface{} {
+	return make([]interface{}, 0)
+}
+
+func (pa *PipelineRunArtifact) ExtractObjectsFromPipelineRun(pr *v1beta1.PipelineRun) []interface{} {
+	return []interface{}{pr}
+}
+
+func (pa *PipelineRunArtifact) Type() string {
+	// TODO: Is this right?
+	return "tekton-pipeline-run"
+}
+
+func (pa *PipelineRunArtifact) StorageBackend(cfg config.Config) sets.String {
+	return cfg.Artifacts.PipelineRuns.StorageBackend
+}
+
+func (pa *PipelineRunArtifact) PayloadFormat(cfg config.Config) formats.PayloadType {
+	return formats.PayloadType(cfg.Artifacts.PipelineRuns.Format)
+}
+
+func (pa *PipelineRunArtifact) Signer(cfg config.Config) string {
+	return cfg.Artifacts.PipelineRuns.Signer
+}
+
+func (pa *PipelineRunArtifact) Enabled(cfg config.Config) bool {
+	return cfg.Artifacts.PipelineRuns.Enabled()
 }
 
 type OCIArtifact struct {
@@ -114,6 +162,10 @@ func (oa *OCIArtifact) ExtractObjects(tr *v1beta1.TaskRun) []interface{} {
 	objs = append(objs, resultImages...)
 
 	return objs
+}
+
+func (oa *OCIArtifact) ExtractObjectsFromPipelineRun(pr *v1beta1.PipelineRun) []interface{} {
+	return make([]interface{}, 0)
 }
 
 func ExtractOCIImagesFromResults(tr *v1beta1.TaskRun, logger *zap.SugaredLogger) []interface{} {
