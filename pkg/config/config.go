@@ -36,8 +36,9 @@ type Config struct {
 
 // ArtifactConfigs contains the configuration for how to sign/store/format the signatures for each artifact type
 type ArtifactConfigs struct {
-	OCI      Artifact
-	TaskRuns Artifact
+	OCI          Artifact
+	PipelineRuns Artifact
+	TaskRuns     Artifact
 }
 
 // Artifact contains the configuration for how to sign/store/format the signatures for a single artifact
@@ -141,6 +142,10 @@ const (
 	taskrunStorageKey = "artifacts.taskrun.storage"
 	taskrunSignerKey  = "artifacts.taskrun.signer"
 
+	pipelinerunFormatKey  = "artifacts.pipelinerun.format"
+	pipelinerunStorageKey = "artifacts.pipelinerun.storage"
+	pipelinerunSignerKey  = "artifacts.pipelinerun.signer"
+
 	ociFormatKey  = "artifacts.oci.format"
 	ociStorageKey = "artifacts.oci.storage"
 	ociSignerKey  = "artifacts.oci.signer"
@@ -198,6 +203,11 @@ func defaultConfig() *Config {
 				StorageBackend: sets.NewString("tekton"),
 				Signer:         "x509",
 			},
+			PipelineRuns: Artifact{
+				Format:         "tekton-pipeline-run",
+				StorageBackend: sets.NewString("tekton"),
+				Signer:         "x509",
+			},
 			OCI: Artifact{
 				Format:         "simplesigning",
 				StorageBackend: sets.NewString("oci"),
@@ -228,6 +238,11 @@ func NewConfigFromMap(data map[string]string) (*Config, error) {
 		asString(taskrunFormatKey, &cfg.Artifacts.TaskRuns.Format, "tekton", "in-toto", "tekton-provenance"),
 		asStringSet(taskrunStorageKey, &cfg.Artifacts.TaskRuns.StorageBackend, sets.NewString("tekton", "oci", "gcs", "docdb", "grafeas", "kafka")),
 		asString(taskrunSignerKey, &cfg.Artifacts.TaskRuns.Signer, "x509", "kms"),
+
+		// PipelineRuns
+		asString(pipelinerunFormatKey, &cfg.Artifacts.PipelineRuns.Format, "tekton", "in-toto", "tekton-provenance"),
+		asStringSet(pipelinerunStorageKey, &cfg.Artifacts.PipelineRuns.StorageBackend, sets.NewString("tekton", "oci", "gcs", "docdb")),
+		asString(pipelinerunSignerKey, &cfg.Artifacts.PipelineRuns.Signer, "x509", "kms"),
 
 		// OCI
 		asString(ociFormatKey, &cfg.Artifacts.OCI.Format, "simplesigning"),

@@ -1459,6 +1459,7 @@ github.com/tektoncd/pipeline/pkg/client/injection/informers/pipeline/v1beta1/tas
 github.com/tektoncd/pipeline/pkg/client/injection/informers/pipeline/v1beta1/task/fake
 github.com/tektoncd/pipeline/pkg/client/injection/informers/pipeline/v1beta1/taskrun
 github.com/tektoncd/pipeline/pkg/client/injection/informers/pipeline/v1beta1/taskrun/fake
+github.com/tektoncd/pipeline/pkg/client/injection/reconciler/pipeline/v1beta1/pipelinerun
 github.com/tektoncd/pipeline/pkg/client/injection/reconciler/pipeline/v1beta1/taskrun
 github.com/tektoncd/pipeline/pkg/client/listers/pipeline/v1alpha1
 github.com/tektoncd/pipeline/pkg/client/listers/pipeline/v1beta1

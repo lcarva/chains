@@ -158,18 +158,24 @@ func TestReconciler_handleTaskRun(t *testing.T) {
 			if err := r.ReconcileKind(ctx, tt.tr); err != nil {
 				t.Errorf("Reconciler.handleTaskRun() error = %v", err)
 			}
-			if signer.signed != tt.shouldSign {
-				t.Errorf("Reconciler.handleTaskRun() signed = %v, wanted %v", signer.signed, tt.shouldSign)
+			if signer.taskRunSigned != tt.shouldSign {
+				t.Errorf("Reconciler.handleTaskRun() signed = %v, wanted %v", signer.taskRunSigned, tt.shouldSign)
 			}
 		})
 	}
 }
 
 type mockSigner struct {
-	signed bool
+	taskRunSigned     bool
+	pipelineRunSigned bool
 }
 
 func (m *mockSigner) SignTaskRun(ctx context.Context, tr *v1beta1.TaskRun) error {
-	m.signed = true
+	m.taskRunSigned = true
+	return nil
+}
+
+func (m *mockSigner) SignPipelineRun(ctx context.Context, pr *v1beta1.PipelineRun) error {
+	m.pipelineRunSigned = true
 	return nil
 }
