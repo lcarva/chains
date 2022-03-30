@@ -36,8 +36,11 @@ import (
 	"knative.dev/pkg/logging"
 )
 
+// TODO: Unclear why an interface is defined here.
 type Signer interface {
 	SignTaskRun(ctx context.Context, tr *v1beta1.TaskRun) error
+	// TODO: This is far from ideal. Introduce a more generic "Sign" method?
+	SignPipelineRun(ctx context.Context, pr *v1beta1.PipelineRun) error
 }
 
 type TaskRunSigner struct {
@@ -222,6 +225,61 @@ func (ts *TaskRunSigner) SignTaskRun(ctx context.Context, tr *v1beta1.TaskRun) e
 
 	// Now mark the TaskRun as signed
 	return MarkSigned(ctx, tr, ts.Pipelineclientset, extraAnnotations)
+}
+
+// SignPipelineRun panics when used.
+func (ts *TaskRunSigner) SignPipelineRun(ctx context.Context, pr *v1beta1.PipelineRun) error {
+	panic("TaskRunSigner does not implement SignPipelineRun!")
+}
+
+type PipelineRunSigner struct {
+	KubeClient        kubernetes.Interface
+	Pipelineclientset versioned.Interface
+	SecretPath        string
+}
+
+// SignPipelineRun signs a PipelineRun, and marks it as signed.
+func (ps *PipelineRunSigner) SignPipelineRun(ctx context.Context, pr *v1beta1.PipelineRun) error {
+	// Get all the things we might need (storage backends, signers and formatters)
+	cfg := *config.FromContext(ctx)
+	logger := logging.FromContext(ctx)
+
+	enabledSignableTypes := []artifacts.Signable{
+		&artifacts.PipelineRunArtifact{Logger: logger},
+	}
+
+	// Storage
+	allFormats := allFormatters(cfg, logger)
+
+	extraAnnotations := map[string]string{}
+	for _, signableType := range enabledSignableTypes {
+		if !signableType.Enabled(cfg) {
+			continue
+		}
+		payloadFormat := signableType.PayloadFormat(cfg)
+		// Find the right payload format and format the object
+
+		if _, ok := allFormats[payloadFormat]; !ok {
+			logger.Warnf("Format %s configured for PipelineRun: %v %s was not found", payloadFormat, pr, signableType.Type())
+			continue
+		}
+
+		// TODO: Find things to sign and sign them, probably just the PipelineRun resource itself?
+		// This is where the bulk of the work will reside. Things to consider:
+		// 	* Should this sign any images that were produced by the pipeline? Or should we let
+		//	  the existing mechanisms do that (based on TaskRuns)?
+		//	* If backend is oci, should the PipelineRun attestation be pushed to every repo where
+		//	  an image was pushed? Would this conflict with attestations pushed by SignTaskRun?
+		//	* Implement retries and all that jazz found in SignTaskRun
+	}
+
+	// Now mark the PipelineRun as signed
+	return MarkPipelineRunSigned(ctx, pr, ps.Pipelineclientset, extraAnnotations)
+}
+
+// SignTaskRun panics when used.
+func (ts *PipelineRunSigner) SignTaskRun(ctx context.Context, tr *v1beta1.TaskRun) error {
+	panic("PipelineRunSigner does not implement SignTaskRun!")
 }
 
 func HandleRetry(ctx context.Context, tr *v1beta1.TaskRun, ps versioned.Interface, annotations map[string]string) error {

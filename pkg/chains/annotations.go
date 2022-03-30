@@ -43,12 +43,33 @@ func Reconciled(tr *v1beta1.TaskRun) bool {
 	return val == "true" || val == "failed"
 }
 
+// TODO: Maybe a single function that switches on the type is better, or just take
+// a generic k8s struct that implements X.ObjectMeta.Annotations ?
+// Reconciled determines whether a PipelineRun has already passed through the reconcile loops, up to 3x
+func ReconciledPipelineRun(pr *v1beta1.PipelineRun) bool {
+	val, ok := pr.ObjectMeta.Annotations[ChainsAnnotation]
+	if !ok {
+		return false
+	}
+	return val == "true" || val == "failed"
+}
+
 // MarkSigned marks a TaskRun as signed.
 func MarkSigned(ctx context.Context, tr *v1beta1.TaskRun, ps versioned.Interface, annotations map[string]string) error {
 	if _, ok := tr.Annotations[ChainsAnnotation]; ok {
 		return nil
 	}
 	return AddAnnotation(ctx, tr, ps, ChainsAnnotation, "true", annotations)
+}
+
+// TODO: Maybe a single function that switches on the type is better, or just take
+// a generic k8s struct that implements X.ObjectMeta.Annotations ?
+// MarkPipelineRunSigned marks a PipelineRun as signed.
+func MarkPipelineRunSigned(ctx context.Context, pr *v1beta1.PipelineRun, ps versioned.Interface, annotations map[string]string) error {
+	if _, ok := pr.Annotations[ChainsAnnotation]; ok {
+		return nil
+	}
+	return AddPipelineRunAnnotation(ctx, pr, ps, ChainsAnnotation, "true", annotations)
 }
 
 func MarkFailed(ctx context.Context, tr *v1beta1.TaskRun, ps versioned.Interface, annotations map[string]string) error {
@@ -91,6 +112,25 @@ func AddAnnotation(ctx context.Context, tr *v1beta1.TaskRun, ps versioned.Interf
 	}
 	if _, err := ps.TektonV1beta1().TaskRuns(tr.Namespace).Patch(
 		ctx, tr.Name, types.MergePatchType, patchBytes, v1.PatchOptions{}); err != nil {
+		return err
+	}
+	return nil
+}
+
+// TODO: Maybe a single function that switches on the type is better, or just take
+// a generic k8s struct that implements X.ObjectMeta.Annotations ?
+func AddPipelineRunAnnotation(ctx context.Context, pr *v1beta1.PipelineRun, ps versioned.Interface, key, value string, annotations map[string]string) error {
+	// Use patch instead of update to help prevent race conditions.
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+	annotations[key] = value
+	patchBytes, err := patch.GetAnnotationsPatch(annotations)
+	if err != nil {
+		return err
+	}
+	if _, err := ps.TektonV1beta1().PipelineRuns(pr.Namespace).Patch(
+		ctx, pr.Name, types.MergePatchType, patchBytes, v1.PatchOptions{}); err != nil {
 		return err
 	}
 	return nil
