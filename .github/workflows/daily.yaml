@@ -54,4 +54,4 @@ jobs:
       timeout-minutes: 10
       run: |
         go install github.com/google/ko@latest
-        ko build --sbom none --bare --tags ${{ github.sha }},latest ./cmd/controller
+        ko build --sbom none --base-import-paths --tags ${{ github.sha }},latest ./cmd/controller
