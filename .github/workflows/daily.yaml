@@ -19,7 +19,7 @@ jobs:
       GOPATH: ${{ github.workspace }}
       GO111MODULE: on
       GOFLAGS: -ldflags=-s -ldflags=-w
-      KO_DOCKER_REPO: ghcr.io/${{ github.repository }}/controller
+      KO_DOCKER_REPO: ghcr.io/${{ github.repository }}
       KOCACHE: ~/ko
 
     steps:
