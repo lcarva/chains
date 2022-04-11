@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/tektoncd/chains/pkg/chains/formats"
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 
 	"github.com/in-toto/in-toto-golang/in_toto"
@@ -70,7 +71,9 @@ func NewStorageBackend(ctx context.Context, logger *zap.SugaredLogger, client ku
 }
 
 // StorePayload implements the storage.Backend interface.
-func (b *Backend) StorePayload(ctx context.Context, tr *v1beta1.TaskRun, rawPayload []byte, signature string, storageOpts config.StorageOpts) error {
+func (b *Backend) StorePayload(ctx context.Context, obj objects.K8sObject, rawPayload []byte, signature string, storageOpts config.StorageOpts) error {
+	// TODO: Handle unexpected type gracefully
+	tr := obj.GetObject().(*v1beta1.TaskRun)
 	auth, err := b.getAuthenticator(ctx, tr, b.client)
 	if err != nil {
 		return err
@@ -205,8 +208,8 @@ func (b *Backend) Type() string {
 	return StorageBackendOCI
 }
 
-func (b *Backend) RetrieveSignatures(ctx context.Context, tr *v1beta1.TaskRun, opts config.StorageOpts) (map[string][]string, error) {
-	images, err := b.RetrieveArtifact(ctx, tr, opts)
+func (b *Backend) RetrieveSignatures(ctx context.Context, obj objects.K8sObject, opts config.StorageOpts) (map[string][]string, error) {
+	images, err := b.RetrieveArtifact(ctx, obj, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -233,9 +236,9 @@ func (b *Backend) RetrieveSignatures(ctx context.Context, tr *v1beta1.TaskRun, o
 	return m, nil
 }
 
-func (b *Backend) RetrievePayloads(ctx context.Context, tr *v1beta1.TaskRun, opts config.StorageOpts) (map[string]string, error) {
+func (b *Backend) RetrievePayloads(ctx context.Context, obj objects.K8sObject, opts config.StorageOpts) (map[string]string, error) {
 	var err error
-	images, err := b.RetrieveArtifact(ctx, tr, opts)
+	images, err := b.RetrieveArtifact(ctx, obj, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +280,9 @@ func (b *Backend) RetrievePayloads(ctx context.Context, tr *v1beta1.TaskRun, opt
 	return m, nil
 }
 
-func (b *Backend) RetrieveArtifact(ctx context.Context, tr *v1beta1.TaskRun, opts config.StorageOpts) (map[string]oci.SignedImage, error) {
+func (b *Backend) RetrieveArtifact(ctx context.Context, obj objects.K8sObject, opts config.StorageOpts) (map[string]oci.SignedImage, error) {
+	// TODO: Handle unexpected type gracefully
+	tr := obj.GetObject().(*v1beta1.TaskRun)
 	// Given the TaskRun, retrieve the OCI images.
 	images := artifacts.ExtractOCIImagesFromResults(tr, b.logger)
 	m := make(map[string]oci.SignedImage)

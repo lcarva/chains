@@ -23,6 +23,7 @@ import (
 
 	"github.com/tektoncd/chains/pkg/chains/formats"
 	"github.com/tektoncd/chains/pkg/chains/formats/simple"
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/config"
 
 	"github.com/google/go-containerregistry/pkg/authn"
@@ -167,7 +168,8 @@ func TestBackend_StorePayload(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to marshal: %v", err)
 			}
-			if err := b.StorePayload(ctx, tt.fields.tr, rawPayload, tt.args.signature, tt.args.storageOpts); (err != nil) != tt.wantErr {
+			trObj := objects.NewTaskRunObject(tt.fields.tr, nil, ctx)
+			if err := b.StorePayload(ctx, trObj, rawPayload, tt.args.signature, tt.args.storageOpts); (err != nil) != tt.wantErr {
 				t.Errorf("Backend.StorePayload() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

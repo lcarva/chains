@@ -16,9 +16,12 @@ package chains
 import (
 	"testing"
 
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	fakepipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client/fake"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	rtesting "knative.dev/pkg/reconciler/testing"
 )
 
 func TestShouldUploadTlog(t *testing.T) {
@@ -82,7 +85,10 @@ func TestShouldUploadTlog(t *testing.T) {
 				},
 			}
 			cfg := config.Config{Transparency: test.cfg}
-			got := shouldUploadTlog(cfg, tr)
+			ctx, _ := rtesting.SetupFakeContext(t)
+			c := fakepipelineclient.Get(ctx)
+			trObj := objects.NewTaskRunObject(tr, c, ctx)
+			got := shouldUploadTlog(cfg, trObj)
 			if got != test.expected {
 				t.Fatalf("got (%v) doesn't match expected (%v)", got, test.expected)
 			}

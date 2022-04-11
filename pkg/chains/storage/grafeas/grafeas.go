@@ -26,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/tektoncd/chains/pkg/artifacts"
 	"github.com/tektoncd/chains/pkg/chains/formats"
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"go.uber.org/zap"
@@ -90,7 +91,9 @@ func NewStorageBackend(ctx context.Context, logger *zap.SugaredLogger, cfg confi
 }
 
 // StorePayload implements the storage.Backend interface.
-func (b *Backend) StorePayload(ctx context.Context, tr *v1beta1.TaskRun, rawPayload []byte, signature string, opts config.StorageOpts) error {
+func (b *Backend) StorePayload(ctx context.Context, obj objects.K8sObject, rawPayload []byte, signature string, opts config.StorageOpts) error {
+	// TODO: Gracefully handle unexpected type
+	tr := obj.GetObject().(*v1beta1.TaskRun)
 	// We only support simplesigning for OCI images, and in-toto for taskrun.
 	if opts.PayloadFormat == formats.PayloadTypeTekton {
 		return errors.New("Grafeas storage backend only supports OCI images and in-toto attestations")
@@ -131,7 +134,9 @@ func (b *Backend) StorePayload(ctx context.Context, tr *v1beta1.TaskRun, rawPayl
 }
 
 // Retrieve payloads from grafeas server and store it in a map
-func (b *Backend) RetrievePayloads(ctx context.Context, tr *v1beta1.TaskRun, opts config.StorageOpts) (map[string]string, error) {
+func (b *Backend) RetrievePayloads(ctx context.Context, obj objects.K8sObject, opts config.StorageOpts) (map[string]string, error) {
+	// TODO: Gracefully handle unexpected type
+	tr := obj.GetObject().(*v1beta1.TaskRun)
 	// initialize an empty map for result
 	result := make(map[string]string)
 
@@ -154,7 +159,9 @@ func (b *Backend) RetrievePayloads(ctx context.Context, tr *v1beta1.TaskRun, opt
 }
 
 // Retrieve signatures from grafeas server and store it in a map
-func (b *Backend) RetrieveSignatures(ctx context.Context, tr *v1beta1.TaskRun, opts config.StorageOpts) (map[string][]string, error) {
+func (b *Backend) RetrieveSignatures(ctx context.Context, obj objects.K8sObject, opts config.StorageOpts) (map[string][]string, error) {
+	// TODO: Gracefully handle unexpected type
+	tr := obj.GetObject().(*v1beta1.TaskRun)
 	// initialize an empty map for result
 	result := make(map[string][]string)
 

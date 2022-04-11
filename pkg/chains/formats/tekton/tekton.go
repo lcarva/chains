@@ -31,14 +31,14 @@ func NewFormatter() (formats.Payloader, error) {
 
 // CreatePayload implements the Payloader interface.
 func (i *Tekton) CreatePayload(obj interface{}) (interface{}, error) {
-
 	switch v := obj.(type) {
 	case *v1beta1.TaskRun:
+		return v.Status, nil
+	case *v1beta1.PipelineRun:
 		return v.Status, nil
 	default:
 		return nil, fmt.Errorf("unsupported type %s", v)
 	}
-
 }
 
 func (i *Tekton) Type() formats.PayloadType {

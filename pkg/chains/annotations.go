@@ -19,6 +19,7 @@ import (
 	"strconv"
 
 	"github.com/pkg/errors"
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/patch"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	versioned "github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
@@ -55,52 +56,43 @@ func ReconciledPipelineRun(pr *v1beta1.PipelineRun) bool {
 }
 
 // MarkSigned marks a TaskRun as signed.
-func MarkSigned(ctx context.Context, tr *v1beta1.TaskRun, ps versioned.Interface, annotations map[string]string) error {
-	if _, ok := tr.Annotations[ChainsAnnotation]; ok {
+func MarkSigned(ctx context.Context, obj objects.K8sObject, ps versioned.Interface, annotations map[string]string) error {
+	ann := obj.GetAnnotation(ChainsAnnotation)
+	if ann.Ok {
 		return nil
 	}
-	return AddAnnotation(ctx, tr, ps, ChainsAnnotation, "true", annotations)
+	return AddAnnotation(ctx, obj, ps, ChainsAnnotation, "true", annotations)
 }
 
-// TODO: Maybe a single function that switches on the type is better, or just take
-// a generic k8s struct that implements X.ObjectMeta.Annotations ?
-// MarkPipelineRunSigned marks a PipelineRun as signed.
-func MarkPipelineRunSigned(ctx context.Context, pr *v1beta1.PipelineRun, ps versioned.Interface, annotations map[string]string) error {
-	if _, ok := pr.Annotations[ChainsAnnotation]; ok {
-		return nil
-	}
-	return AddPipelineRunAnnotation(ctx, pr, ps, ChainsAnnotation, "true", annotations)
+func MarkFailed(ctx context.Context, obj objects.K8sObject, ps versioned.Interface, annotations map[string]string) error {
+	return AddAnnotation(ctx, obj, ps, ChainsAnnotation, "failed", annotations)
 }
 
-func MarkFailed(ctx context.Context, tr *v1beta1.TaskRun, ps versioned.Interface, annotations map[string]string) error {
-	return AddAnnotation(ctx, tr, ps, ChainsAnnotation, "failed", annotations)
-}
-
-func RetryAvailable(tr *v1beta1.TaskRun) bool {
-	retries, ok := tr.Annotations[RetryAnnotation]
-	if !ok {
+func RetryAvailable(obj objects.K8sObject) bool {
+	ann := obj.GetAnnotation(RetryAnnotation)
+	if !ann.Ok {
 		return true
 	}
-	val, err := strconv.Atoi(retries)
+	val, err := strconv.Atoi(ann.Value)
 	if err != nil {
 		return false
 	}
 	return val < MaxRetries
 }
 
-func AddRetry(ctx context.Context, tr *v1beta1.TaskRun, ps versioned.Interface, annotations map[string]string) error {
-	retries := tr.Annotations[RetryAnnotation]
-	if retries == "" {
-		return AddAnnotation(ctx, tr, ps, RetryAnnotation, "0", annotations)
+func AddRetry(ctx context.Context, obj objects.K8sObject, ps versioned.Interface, annotations map[string]string) error {
+	ann := obj.GetAnnotation(RetryAnnotation)
+	if ann.Value == "" {
+		return AddAnnotation(ctx, obj, ps, RetryAnnotation, "0", annotations)
 	}
-	val, err := strconv.Atoi(retries)
+	val, err := strconv.Atoi(ann.Value)
 	if err != nil {
 		return errors.Wrap(err, "adding retry")
 	}
-	return AddAnnotation(ctx, tr, ps, RetryAnnotation, fmt.Sprintf("%d", val+1), annotations)
+	return AddAnnotation(ctx, obj, ps, RetryAnnotation, fmt.Sprintf("%d", val+1), annotations)
 }
 
-func AddAnnotation(ctx context.Context, tr *v1beta1.TaskRun, ps versioned.Interface, key, value string, annotations map[string]string) error {
+func AddAnnotation(ctx context.Context, obj objects.K8sObject, ps versioned.Interface, key, value string, annotations map[string]string) error {
 	// Use patch instead of update to help prevent race conditions.
 	if annotations == nil {
 		annotations = map[string]string{}
@@ -110,8 +102,8 @@ func AddAnnotation(ctx context.Context, tr *v1beta1.TaskRun, ps versioned.Interf
 	if err != nil {
 		return err
 	}
-	if _, err := ps.TektonV1beta1().TaskRuns(tr.Namespace).Patch(
-		ctx, tr.Name, types.MergePatchType, patchBytes, v1.PatchOptions{}); err != nil {
+	err = obj.Patch(patchBytes)
+	if err != nil {
 		return err
 	}
 	return nil

@@ -25,6 +25,7 @@ import (
 	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6"
 	"github.com/tektoncd/chains/pkg/chains/formats/simple"
 	"github.com/tektoncd/chains/pkg/chains/formats/tekton"
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/chains/signing"
 	"github.com/tektoncd/chains/pkg/chains/signing/kms"
 	"github.com/tektoncd/chains/pkg/chains/signing/x509"
@@ -38,9 +39,7 @@ import (
 
 // TODO: Unclear why an interface is defined here.
 type Signer interface {
-	SignTaskRun(ctx context.Context, tr *v1beta1.TaskRun) error
-	// TODO: This is far from ideal. Introduce a more generic "Sign" method?
-	SignPipelineRun(ctx context.Context, pr *v1beta1.PipelineRun) error
+	Sign(ctx context.Context, obj interface{}) error
 }
 
 type TaskRunSigner struct {
@@ -113,7 +112,7 @@ func AllFormatters(cfg config.Config, l *zap.SugaredLogger) map[formats.PayloadT
 }
 
 // SignTaskRun signs a TaskRun, and marks it as signed.
-func (ts *TaskRunSigner) SignTaskRun(ctx context.Context, tr *v1beta1.TaskRun) error {
+func (ts *TaskRunSigner) Sign(ctx context.Context, object interface{}) error {
 	cfg := *config.FromContext(ctx)
 	logger := logging.FromContext(ctx)
 
@@ -122,6 +121,9 @@ func (ts *TaskRunSigner) SignTaskRun(ctx context.Context, tr *v1beta1.TaskRun) e
 		&artifacts.TaskRunArtifact{Logger: logger},
 		&artifacts.OCIArtifact{Logger: logger},
 	}
+
+	tr := object.(*v1beta1.TaskRun)
+	trObj := objects.NewTaskRunObject(tr, ts.Pipelineclientset, ctx)
 
 	signers := allSigners(ctx, ts.SecretPath, cfg, logger)
 
@@ -198,13 +200,13 @@ func (ts *TaskRunSigner) SignTaskRun(ctx context.Context, tr *v1beta1.TaskRun) e
 					Chain:         signer.Chain(),
 					PayloadFormat: payloadFormat,
 				}
-				if err := b.StorePayload(ctx, tr, rawPayload, string(signature), storageOpts); err != nil {
+				if err := b.StorePayload(ctx, trObj, rawPayload, string(signature), storageOpts); err != nil {
 					logger.Error(err)
 					merr = multierror.Append(merr, err)
 				}
 			}
 
-			if shouldUploadTlog(cfg, tr) {
+			if shouldUploadTlog(cfg, trObj) {
 				entry, err := rekorClient.UploadTlog(ctx, signer, signature, rawPayload, signer.Cert(), string(payloadFormat))
 				if err != nil {
 					merr = multierror.Append(merr, err)
@@ -216,7 +218,7 @@ func (ts *TaskRunSigner) SignTaskRun(ctx context.Context, tr *v1beta1.TaskRun) e
 			}
 		}
 		if merr.ErrorOrNil() != nil {
-			if err := HandleRetry(ctx, tr, ts.Pipelineclientset, extraAnnotations); err != nil {
+			if err := HandleRetry(ctx, trObj, ts.Pipelineclientset, extraAnnotations); err != nil {
 				merr = multierror.Append(merr, err)
 			}
 			return merr
@@ -224,22 +226,26 @@ func (ts *TaskRunSigner) SignTaskRun(ctx context.Context, tr *v1beta1.TaskRun) e
 	}
 
 	// Now mark the TaskRun as signed
-	return MarkSigned(ctx, tr, ts.Pipelineclientset, extraAnnotations)
-}
-
-// SignPipelineRun panics when used.
-func (ts *TaskRunSigner) SignPipelineRun(ctx context.Context, pr *v1beta1.PipelineRun) error {
-	panic("TaskRunSigner does not implement SignPipelineRun!")
+	return MarkSigned(ctx, trObj, ts.Pipelineclientset, extraAnnotations)
 }
 
 type PipelineRunSigner struct {
-	KubeClient        kubernetes.Interface
+	// Formatters: format payload
+	// The keys are the names of different formatters {tekton, in-toto, simplesigning}. The first two are for TaskRun artifact, and simplesigning is for OCI artifact.
+	// The values are actual `Payloader` interfaces that can generate payload in different format from taskrun.
+	Formatters map[formats.PayloadType]formats.Payloader
+
+	// Backends: store payload and signature
+	// The keys are different storage option's name. {docdb, gcs, grafeas, oci, tekton}
+	// The values are the actual storage backends that will be used to store and retrieve provenance.
+	Backends          map[string]storage.Backend
 	Pipelineclientset versioned.Interface
 	SecretPath        string
 }
 
 // SignPipelineRun signs a PipelineRun, and marks it as signed.
-func (ps *PipelineRunSigner) SignPipelineRun(ctx context.Context, pr *v1beta1.PipelineRun) error {
+// TODO: Alot of overlap with TaskRunSigner.Sign, could probably merge them and pass a generic objects.K8sObject
+func (ps *PipelineRunSigner) Sign(ctx context.Context, object interface{}) error {
 	// Get all the things we might need (storage backends, signers and formatters)
 	cfg := *config.FromContext(ctx)
 	logger := logging.FromContext(ctx)
@@ -248,43 +254,119 @@ func (ps *PipelineRunSigner) SignPipelineRun(ctx context.Context, pr *v1beta1.Pi
 		&artifacts.PipelineRunArtifact{Logger: logger},
 	}
 
-	// Storage
-	allFormats := allFormatters(cfg, logger)
+	pr := object.(*v1beta1.PipelineRun)
+	prObj := objects.NewPipelineRunObject(pr, ps.Pipelineclientset, ctx)
 
+	signers := allSigners(ctx, ps.SecretPath, cfg, logger)
+
+	rekorClient, err := getRekor(cfg.Transparency.URL, logger)
+	if err != nil {
+		return err
+	}
+
+	// TODO: Find things to sign and sign them, probably just the PipelineRun resource itself?
+	// This is where the bulk of the work will reside. Things to consider:
+	// 	* Should this sign any images that were produced by the pipeline? Or should we let
+	//	  the existing mechanisms do that (based on TaskRuns)?
+	//	* If backend is oci, should the PipelineRun attestation be pushed to every repo where
+	//	  an image was pushed? Would this conflict with attestations pushed by SignTaskRun?
+	//	* Implement retries and all that jazz found in SignTaskRun
+	var merr *multierror.Error
 	extraAnnotations := map[string]string{}
 	for _, signableType := range enabledSignableTypes {
 		if !signableType.Enabled(cfg) {
 			continue
 		}
 		payloadFormat := signableType.PayloadFormat(cfg)
-		// Find the right payload format and format the object
-
-		if _, ok := allFormats[payloadFormat]; !ok {
+		payloader, ok := ps.Formatters[payloadFormat]
+		if !ok {
 			logger.Warnf("Format %s configured for PipelineRun: %v %s was not found", payloadFormat, pr, signableType.Type())
 			continue
 		}
 
-		// TODO: Find things to sign and sign them, probably just the PipelineRun resource itself?
-		// This is where the bulk of the work will reside. Things to consider:
-		// 	* Should this sign any images that were produced by the pipeline? Or should we let
-		//	  the existing mechanisms do that (based on TaskRuns)?
-		//	* If backend is oci, should the PipelineRun attestation be pushed to every repo where
-		//	  an image was pushed? Would this conflict with attestations pushed by SignTaskRun?
-		//	* Implement retries and all that jazz found in SignTaskRun
+		objects := signableType.ExtractObjects(pr)
+
+		for _, obj := range objects {
+			payload, err := payloader.CreatePayload(obj)
+			if err != nil {
+				logger.Infof("Error creating payload")
+				logger.Error(err)
+				continue
+			}
+			logger.Infof("Created payload of type %s for Pipelinerun %s/%s", string(payloadFormat), pr.Namespace, pr.Name)
+
+			// Sign it!
+			signerType := signableType.Signer(cfg)
+			signer, ok := signers[signerType]
+			if !ok {
+				logger.Warnf("No signer %s configured for %s", signerType, signableType.Type())
+				continue
+			}
+
+			if payloader.Wrap() {
+				wrapped, err := signing.Wrap(ctx, signer)
+				if err != nil {
+					return err
+				}
+				logger.Infof("Using wrapped envelope signer for %s", payloader.Type())
+				signer = wrapped
+			}
+
+			logger.Infof("Signing object with %s", signerType)
+			rawPayload, err := json.Marshal(payload)
+			if err != nil {
+				logger.Warnf("Unable to marshal payload: %v", signerType, obj)
+				continue
+			}
+
+			signature, err := signer.SignMessage(bytes.NewReader(rawPayload))
+			if err != nil {
+				logger.Error(err)
+				continue
+			}
+
+			// Now store those!
+			for _, backend := range signableType.StorageBackend(cfg).List() {
+				b := ps.Backends[backend]
+				storageOpts := config.StorageOpts{
+					Key:           signableType.Key(obj),
+					Cert:          signer.Cert(),
+					Chain:         signer.Chain(),
+					PayloadFormat: payloadFormat,
+				}
+				if err := b.StorePayload(ctx, prObj, rawPayload, string(signature), storageOpts); err != nil {
+					logger.Error(err)
+					merr = multierror.Append(merr, err)
+				}
+			}
+
+			if shouldUploadTlog(cfg, prObj) {
+				entry, err := rekorClient.UploadTlog(ctx, signer, signature, rawPayload, signer.Cert(), string(payloadFormat))
+				if err != nil {
+					logger.Error(err)
+					merr = multierror.Append(merr, err)
+				} else {
+					logger.Infof("Uploaded entry to %s with index %d", cfg.Transparency.URL, *entry.LogIndex)
+
+					extraAnnotations[ChainsTransparencyAnnotation] = fmt.Sprintf("%s/api/v1/log/entries?logIndex=%d", cfg.Transparency.URL, *entry.LogIndex)
+				}
+			}
+		}
+		if merr.ErrorOrNil() != nil {
+			if err := HandleRetry(ctx, prObj, ps.Pipelineclientset, extraAnnotations); err != nil {
+				merr = multierror.Append(merr, err)
+			}
+			return merr
+		}
 	}
 
 	// Now mark the PipelineRun as signed
-	return MarkPipelineRunSigned(ctx, pr, ps.Pipelineclientset, extraAnnotations)
+	return MarkSigned(ctx, prObj, ps.Pipelineclientset, extraAnnotations)
 }
 
-// SignTaskRun panics when used.
-func (ts *PipelineRunSigner) SignTaskRun(ctx context.Context, tr *v1beta1.TaskRun) error {
-	panic("PipelineRunSigner does not implement SignTaskRun!")
-}
-
-func HandleRetry(ctx context.Context, tr *v1beta1.TaskRun, ps versioned.Interface, annotations map[string]string) error {
-	if RetryAvailable(tr) {
-		return AddRetry(ctx, tr, ps, annotations)
+func HandleRetry(ctx context.Context, obj objects.K8sObject, ps versioned.Interface, annotations map[string]string) error {
+	if RetryAvailable(obj) {
+		return AddRetry(ctx, obj, ps, annotations)
 	}
-	return MarkFailed(ctx, tr, ps, annotations)
+	return MarkFailed(ctx, obj, ps, annotations)
 }

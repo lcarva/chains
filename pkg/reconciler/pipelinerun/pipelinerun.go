@@ -58,7 +58,7 @@ func (r *Reconciler) FinalizeKind(ctx context.Context, pr *v1beta1.PipelineRun) 
 		return nil
 	}
 
-	if err := r.PipelineRunSigner.SignPipelineRun(ctx, pr); err != nil {
+	if err := r.PipelineRunSigner.Sign(ctx, pr); err != nil {
 		return err
 	}
 	return nil
