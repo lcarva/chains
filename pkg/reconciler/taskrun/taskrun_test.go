@@ -170,12 +170,8 @@ type mockSigner struct {
 	pipelineRunSigned bool
 }
 
-func (m *mockSigner) SignTaskRun(ctx context.Context, tr *v1beta1.TaskRun) error {
+func (m *mockSigner) Sign(ctx context.Context, obj interface{}) error {
 	m.taskRunSigned = true
-	return nil
-}
-
-func (m *mockSigner) SignPipelineRun(ctx context.Context, pr *v1beta1.PipelineRun) error {
 	m.pipelineRunSigned = true
 	return nil
 }

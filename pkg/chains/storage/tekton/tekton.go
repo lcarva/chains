@@ -16,17 +16,17 @@ package tekton
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/config"
 
 	"github.com/tektoncd/chains/pkg/patch"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
-	versioned "github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
+	"github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
 	"go.uber.org/zap"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
@@ -53,8 +53,8 @@ func NewStorageBackend(ps versioned.Interface, logger *zap.SugaredLogger) *Backe
 }
 
 // StorePayload implements the Payloader interface.
-func (b *Backend) StorePayload(ctx context.Context, tr *v1beta1.TaskRun, rawPayload []byte, signature string, opts config.StorageOpts) error {
-	b.logger.Infof("Storing payload on TaskRun %s/%s", tr.Namespace, tr.Name)
+func (b *Backend) StorePayload(ctx context.Context, obj objects.K8sObject, rawPayload []byte, signature string, opts config.StorageOpts) error {
+	b.logger.Infof("Storing payload on %s/%s/%s", obj.GetNamespace(), obj.GetKind(), obj.GetName())
 
 	// Use patch instead of update to prevent race conditions.
 	patchBytes, err := patch.GetAnnotationsPatch(map[string]string{
@@ -67,9 +67,11 @@ func (b *Backend) StorePayload(ctx context.Context, tr *v1beta1.TaskRun, rawPayl
 	if err != nil {
 		return err
 	}
-	if _, err := b.pipelienclientset.TektonV1beta1().TaskRuns(tr.Namespace).Patch(
-		ctx, tr.Name, types.MergePatchType, patchBytes, v1.PatchOptions{}); err != nil {
-		return err
+	// if _, err := b.pipelienclientset.TektonV1beta1().TaskRuns(tr.Namespace).Patch(
+	// 	return err
+	patchErr := obj.Patch(patchBytes)
+	if patchErr != nil {
+		return patchErr
 	}
 	return nil
 }
@@ -79,29 +81,24 @@ func (b *Backend) Type() string {
 }
 
 // retrieveAnnotationValue retrieve the value of an annotation and base64 decode it if needed.
-func (b *Backend) retrieveAnnotationValue(ctx context.Context, tr *v1beta1.TaskRun, annotationKey string, decode bool) (string, error) {
+func (b *Backend) retrieveAnnotationValue(ctx context.Context, obj objects.K8sObject, annotationKey string, decode bool) (string, error) {
 	// Retrieve the TaskRun.
-	b.logger.Infof("Retrieving annotation %q on TaskRun %s/%s", annotationKey, tr.Namespace, tr.Name)
-	tr, err := b.pipelienclientset.TektonV1beta1().TaskRuns(tr.Namespace).Get(ctx, tr.Name, v1.GetOptions{})
-	if err != nil {
-		return "", fmt.Errorf("error retrieving taskrun: %s", err)
-	}
+	b.logger.Infof("Retrieving annotation %q on %s/%s/%s", annotationKey, obj.GetNamespace(), obj.GetKind(), obj.GetName())
 
-	// Retrieve the annotation.
 	var annotationValue string
-	rawAnnotationValue, exists := tr.Annotations[annotationKey]
+	ann := obj.GetLatestAnnotation(annotationKey)
 
 	// Ensure it exists.
-	if exists {
+	if ann.Ok {
 		// Decode it if needed.
 		if decode {
-			decodedAnnotation, err := base64.StdEncoding.DecodeString(rawAnnotationValue)
+			decodedAnnotation, err := base64.StdEncoding.DecodeString(ann.Value)
 			if err != nil {
 				return "", fmt.Errorf("error decoding the annotation value for the key %q: %s", annotationKey, err)
 			}
 			annotationValue = string(decodedAnnotation)
 		} else {
-			annotationValue = rawAnnotationValue
+			annotationValue = ann.Value
 		}
 	}
 
@@ -109,12 +106,26 @@ func (b *Backend) retrieveAnnotationValue(ctx context.Context, tr *v1beta1.TaskR
 }
 
 // RetrieveSignature retrieve the signature stored in the taskrun.
-func (b *Backend) RetrieveSignatures(ctx context.Context, tr *v1beta1.TaskRun, opts config.StorageOpts) (map[string][]string, error) {
-	b.logger.Infof("Retrieving signature on TaskRun %s/%s", tr.Namespace, tr.Name)
+func (b *Backend) RetrieveSignatures(ctx context.Context, obj objects.K8sObject, opts config.StorageOpts) (map[string][]string, error) {
+	b.logger.Infof("Retrieving signature on %s/%s/%s", obj.GetNamespace(), obj.GetKind(), obj.GetName())
 	signatureAnnotation := sigName(opts)
-	signature, err := b.retrieveAnnotationValue(ctx, tr, signatureAnnotation, true)
+	signature, err := b.retrieveAnnotationValue(ctx, obj, signatureAnnotation, true)
 	if err != nil {
 		return nil, err
+	}
+
+	// Check if we have a pipelinerun object, if so just return the signature
+	_, ok := obj.GetObject().(*v1beta1.PipelineRun)
+	if ok {
+		return map[string][]string{
+			signatureAnnotation: {signature},
+		}, nil
+	}
+
+	// We must have a taskrun object, so check for the IMAGE_URL param before adding signature
+	tr, ok := obj.GetObject().(*v1beta1.TaskRun)
+	if !ok {
+		return nil, errors.New("unrecognized object type for retrieving signatures")
 	}
 
 	m := make(map[string][]string)
@@ -128,13 +139,28 @@ func (b *Backend) RetrieveSignatures(ctx context.Context, tr *v1beta1.TaskRun, o
 }
 
 // RetrievePayload retrieve the payload stored in the taskrun.
-func (b *Backend) RetrievePayloads(ctx context.Context, tr *v1beta1.TaskRun, opts config.StorageOpts) (map[string]string, error) {
-	b.logger.Infof("Retrieving payload on TaskRun %s/%s", tr.Namespace, tr.Name)
+func (b *Backend) RetrievePayloads(ctx context.Context, obj objects.K8sObject, opts config.StorageOpts) (map[string]string, error) {
+	b.logger.Infof("Retrieving payload on %s/%s/%s", obj.GetNamespace(), obj.GetKind(), obj.GetName())
 	payloadAnnotation := payloadName(opts)
-	payload, err := b.retrieveAnnotationValue(ctx, tr, payloadAnnotation, true)
+	payload, err := b.retrieveAnnotationValue(ctx, obj, payloadAnnotation, true)
 	if err != nil {
 		return nil, err
 	}
+
+	// Check if we have a pipelinerun object, if so just return the signature
+	_, ok := obj.GetObject().(*v1beta1.PipelineRun)
+	if ok {
+		return map[string]string{
+			payloadAnnotation: payload,
+		}, nil
+	}
+
+	// We must have a taskrun object, so check for the IMAGE_URL param before adding signature
+	tr, ok := obj.GetObject().(*v1beta1.TaskRun)
+	if !ok {
+		return nil, errors.New("unrecognized object type for retrieving payload")
+	}
+
 	m := make(map[string]string)
 	for _, res := range tr.Status.TaskRunResults {
 		if strings.HasSuffix(res.Name, "IMAGE_URL") {

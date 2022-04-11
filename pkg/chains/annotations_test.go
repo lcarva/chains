@@ -16,6 +16,7 @@ package chains
 import (
 	"testing"
 
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	fakepipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -96,12 +97,15 @@ func TestRetryAvailble(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
+			ctx, _ := rtesting.SetupFakeContext(t)
+			c := fakepipelineclient.Get(ctx)
 			tr := &v1beta1.TaskRun{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: test.annotations,
 				},
 			}
-			got := RetryAvailable(tr)
+			trObj := objects.NewTaskRunObject(tr, c, ctx)
+			got := RetryAvailable(trObj)
 			if got != test.expected {
 				t.Fatalf("RetryAvailble() got %v expected %v", got, test.expected)
 			}
@@ -120,8 +124,10 @@ func TestAddRetry(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	trObj := objects.NewTaskRunObject(tr, c, ctx)
+
 	// run it through AddRetry, make sure annotation is added
-	if err := AddRetry(ctx, tr, c, nil); err != nil {
+	if err := AddRetry(ctx, trObj, c, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -135,7 +141,8 @@ func TestAddRetry(t *testing.T) {
 	}
 
 	// run it again, make sure we see an increase
-	if err := AddRetry(ctx, signed, c, nil); err != nil {
+	trObj = objects.NewTaskRunObject(signed, c, ctx)
+	if err := AddRetry(ctx, trObj, c, nil); err != nil {
 		t.Fatal(err)
 	}
 	signed, err = c.TektonV1beta1().TaskRuns(tr.Namespace).Get(ctx, tr.Name, metav1.GetOptions{})

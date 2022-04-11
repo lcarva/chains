@@ -58,7 +58,7 @@ func (r *Reconciler) FinalizeKind(ctx context.Context, tr *v1beta1.TaskRun) pkgr
 		return nil
 	}
 
-	if err := r.TaskRunSigner.SignTaskRun(ctx, tr); err != nil {
+	if err := r.TaskRunSigner.Sign(ctx, tr); err != nil {
 		return err
 	}
 	return nil

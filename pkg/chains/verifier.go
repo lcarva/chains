@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/tektoncd/chains/pkg/artifacts"
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/chains/storage"
 	"github.com/tektoncd/chains/pkg/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
@@ -48,6 +49,9 @@ func (tv *TaskRunVerifier) VerifyTaskRun(ctx context.Context, tr *v1beta1.TaskRu
 		&artifacts.OCIArtifact{Logger: logger},
 	}
 
+	// TODO: Use non-nil clientset?
+	trObj := objects.NewTaskRunObject(tr, nil, ctx)
+
 	// Storage
 	allBackends, err := storage.InitializeBackends(ctx, tv.Pipelineclientset, tv.KubeClient, logger, cfg)
 	if err != nil {
@@ -69,11 +73,11 @@ func (tv *TaskRunVerifier) VerifyTaskRun(ctx context.Context, tr *v1beta1.TaskRu
 
 		for _, backend := range signableType.StorageBackend(cfg).List() {
 			b := allBackends[backend]
-			signatures, err := b.RetrieveSignatures(ctx, tr, config.StorageOpts{})
+			signatures, err := b.RetrieveSignatures(ctx, trObj, config.StorageOpts{})
 			if err != nil {
 				return err
 			}
-			payload, err := b.RetrievePayloads(ctx, tr, config.StorageOpts{})
+			payload, err := b.RetrievePayloads(ctx, trObj, config.StorageOpts{})
 			if err != nil {
 				return err
 			}

@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tektoncd/chains/pkg/chains/formats"
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -160,7 +161,7 @@ func TestBackend_StorePayload(t *testing.T) {
 				signature: "oci signature",
 				// The Key field must be the same as the first 12 chars of the image digest.
 				// Reason:
-				// Inside chains.SignTaskRun function, we set the key field for both artifacts.
+				// Inside chains.Sign function, we set the key field for both artifacts.
 				// For OCI artifact, it is implemented as the first 12 chars of the image digest.
 				// https://github.com/tektoncd/chains/blob/v0.8.0/pkg/artifacts/signable.go#L200
 				opts: config.StorageOpts{Key: "cfe4f0bf41c8", PayloadFormat: formats.PayloadTypeSimpleSigning},
@@ -227,7 +228,8 @@ func TestBackend_StorePayload(t *testing.T) {
 
 // test attestation storage and retrieval
 func testInterface(ctx context.Context, t *testing.T, test testConfig, backend Backend) {
-	if err := backend.StorePayload(ctx, test.args.tr, test.args.payload, test.args.signature, test.args.opts); (err != nil) != test.wantErr {
+	trObj := objects.NewTaskRunObject(test.args.tr, nil, ctx)
+	if err := backend.StorePayload(ctx, trObj, test.args.payload, test.args.signature, test.args.opts); (err != nil) != test.wantErr {
 		t.Fatalf("Backend.StorePayload() failed. error:%v, wantErr:%v", err, test.wantErr)
 	}
 
@@ -238,7 +240,7 @@ func testInterface(ctx context.Context, t *testing.T, test testConfig, backend B
 
 	// check signature
 	expectSignature := map[string][]string{objectIdentifier: {test.args.signature}}
-	gotSignature, err := backend.RetrieveSignatures(ctx, test.args.tr, test.args.opts)
+	gotSignature, err := backend.RetrieveSignatures(ctx, trObj, test.args.opts)
 	if err != nil {
 		t.Fatal("Backend.RetrieveSignatures() failed. error:", err)
 	}
@@ -249,7 +251,7 @@ func testInterface(ctx context.Context, t *testing.T, test testConfig, backend B
 
 	// check payload
 	expectPayload := map[string]string{objectIdentifier: string(test.args.payload)}
-	gotPayload, err := backend.RetrievePayloads(ctx, test.args.tr, test.args.opts)
+	gotPayload, err := backend.RetrievePayloads(ctx, trObj, test.args.opts)
 	if err != nil {
 		t.Fatalf("RetrievePayloads.RetrievePayloads() failed. error:%v", err)
 	}

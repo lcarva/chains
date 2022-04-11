@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/in-toto/in-toto-golang/in_toto"
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"gocloud.dev/pubsub"
@@ -108,8 +109,9 @@ func TestBackend_StorePayload(t *testing.T) {
 				}
 			}()
 
+			trObj := objects.NewTaskRunObject(tt.fields.tr, nil, ctx)
 			// Store the payload.
-			if err := b.StorePayload(ctx, tt.fields.tr, tt.args.rawPayload, tt.args.signature, tt.args.storageOpts); (err != nil) != tt.wantErr {
+			if err := b.StorePayload(ctx, trObj, tt.args.rawPayload, tt.args.signature, tt.args.storageOpts); (err != nil) != tt.wantErr {
 				t.Errorf("Backend.StorePayload() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
