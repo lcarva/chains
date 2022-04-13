@@ -1,4 +1,4 @@
-name: Daily image build
+name: Daily jobs
 
 on:
   schedule:
@@ -61,3 +61,31 @@ jobs:
       run: |
         go install github.com/google/ko@latest
         ko build --sbom none --base-import-paths --tags $(git rev-parse HEAD),${{ matrix.branch }}$([[ "${{ matrix.branch }}" == "main" ]] && echo ",latest" ) ./cmd/controller
+
+  sync:
+    name: Synchronize with upstream
+    runs-on: ubuntu-latest
+
+    env:
+      GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Synchronize main
+        run: |
+          git config --global user.name 'HACBS EC Robot'
+          git config --global user.email 'hacbsec@users.noreply.github.com'
+          git remote add upstream https://github.com/tektoncd/chains.git
+          git fetch upstream main
+          git switch main
+          git rebase upstream/main
+          git push --force origin HEAD:main
+
+      - name: Synchronize poc-tep-84
+        run: |
+          git switch poc-tep-84
+          git rebase main
+          git push --force origin HEAD:poc-tep-84
