@@ -149,7 +149,7 @@ func (ts *TaskRunSigner) Sign(ctx context.Context, object interface{}) error {
 
 		// Extract all the "things" to be signed.
 		// We might have a few of each type (several binaries, or images)
-		objects := signableType.ExtractObjects(tr)
+		objects := signableType.ExtractObjects(trObj)
 
 		// Go through each object one at a time.
 		for _, obj := range objects {
@@ -284,7 +284,7 @@ func (ps *PipelineRunSigner) Sign(ctx context.Context, object interface{}) error
 			continue
 		}
 
-		objects := signableType.ExtractObjects(pr)
+		objects := signableType.ExtractObjects(prObj)
 
 		for _, obj := range objects {
 			payload, err := payloader.CreatePayload(obj)

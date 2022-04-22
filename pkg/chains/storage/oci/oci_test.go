@@ -158,9 +158,15 @@ func TestBackend_StorePayload(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Trying to create context fails with "Unable to fetch labelkey from context."
+			// We don't need the context or client so we'll just pass nil for now
+			// ctx, _ := rtesting.SetupFakeContext(t)
+			// c := fakepipelineclient.Get(ctx)
+			// obj := objects.NewTaskRunObject(tt.fields.tr, c, ctx)
+			trObj := objects.NewTaskRunObject(tt.fields.tr, nil, nil)
 			b := &Backend{
 				logger: logtesting.TestLogger(t),
-				getAuthenticator: func(_ context.Context, _ *v1beta1.TaskRun, _ kubernetes.Interface) (remote.Option, error) {
+				getAuthenticator: func(_ context.Context, _ objects.K8sObject, _ kubernetes.Interface) (remote.Option, error) {
 					return remote.WithAuthFromKeychain(authn.DefaultKeychain), nil
 				},
 			}
@@ -168,7 +174,6 @@ func TestBackend_StorePayload(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to marshal: %v", err)
 			}
-			trObj := objects.NewTaskRunObject(tt.fields.tr, nil, ctx)
 			if err := b.StorePayload(ctx, trObj, rawPayload, tt.args.signature, tt.args.storageOpts); (err != nil) != tt.wantErr {
 				t.Errorf("Backend.StorePayload() error = %v, wantErr %v", err, tt.wantErr)
 			}

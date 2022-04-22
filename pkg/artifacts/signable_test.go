@@ -21,8 +21,12 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	fakepipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client/fake"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	logtesting "knative.dev/pkg/logging/testing"
+	rtesting "knative.dev/pkg/reconciler/testing"
 )
 
 const (
@@ -33,15 +37,20 @@ const (
 var ignore = []cmp.Option{cmpopts.IgnoreUnexported(name.Registry{}, name.Repository{}, name.Digest{})}
 
 func TestOCIArtifact_ExtractObjects(t *testing.T) {
+	ctx, _ := rtesting.SetupFakeContext(t)
+	c := fakepipelineclient.Get(ctx)
 
 	tests := []struct {
 		name string
-		tr   *v1beta1.TaskRun
+		obj  objects.K8sObject
 		want []interface{}
 	}{
 		{
 			name: "one image",
-			tr: &v1beta1.TaskRun{
+			obj: objects.NewTaskRunObject(&v1beta1.TaskRun{
+				TypeMeta: metav1.TypeMeta{
+					Kind: "TaskRun",
+				},
 				Status: v1beta1.TaskRunStatus{
 					TaskRunStatusFields: v1beta1.TaskRunStatusFields{
 						ResourcesResult: []v1beta1.PipelineResourceResult{
@@ -70,12 +79,15 @@ func TestOCIArtifact_ExtractObjects(t *testing.T) {
 						},
 					},
 				},
-			},
+			}, c, ctx),
 			want: []interface{}{digest(t, "gcr.io/foo/bar@sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b5")},
 		},
 		{
 			name: "two images",
-			tr: &v1beta1.TaskRun{
+			obj: objects.NewTaskRunObject(&v1beta1.TaskRun{
+				TypeMeta: metav1.TypeMeta{
+					Kind: "TaskRun",
+				},
 				Status: v1beta1.TaskRunStatus{
 					TaskRunStatusFields: v1beta1.TaskRunStatusFields{
 						ResourcesResult: []v1beta1.PipelineResourceResult{
@@ -120,7 +132,7 @@ func TestOCIArtifact_ExtractObjects(t *testing.T) {
 						},
 					},
 				},
-			},
+			}, c, ctx),
 			want: []interface{}{
 				digest(t, "gcr.io/foo/bar@sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b5"),
 				digest(t, "gcr.io/foo/baz@sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b6"),
@@ -128,7 +140,10 @@ func TestOCIArtifact_ExtractObjects(t *testing.T) {
 		},
 		{
 			name: "resource and result",
-			tr: &v1beta1.TaskRun{
+			obj: objects.NewTaskRunObject(&v1beta1.TaskRun{
+				TypeMeta: metav1.TypeMeta{
+					Kind: "TaskRun",
+				},
 				Status: v1beta1.TaskRunStatus{
 					TaskRunStatusFields: v1beta1.TaskRunStatusFields{
 						ResourcesResult: []v1beta1.PipelineResourceResult{
@@ -175,14 +190,17 @@ func TestOCIArtifact_ExtractObjects(t *testing.T) {
 						},
 					},
 				},
-			},
+			}, c, ctx),
 			want: []interface{}{
 				digest(t, "gcr.io/foo/bat@sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b4"),
 				digest(t, "gcr.io/foo/bar@sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b5")},
 		},
 		{
 			name: "extra",
-			tr: &v1beta1.TaskRun{
+			obj: objects.NewTaskRunObject(&v1beta1.TaskRun{
+				TypeMeta: metav1.TypeMeta{
+					Kind: "TaskRun",
+				},
 				Status: v1beta1.TaskRunStatus{
 					TaskRunStatusFields: v1beta1.TaskRunStatusFields{
 						TaskRunResults: []v1beta1.TaskRunResult{
@@ -231,11 +249,11 @@ func TestOCIArtifact_ExtractObjects(t *testing.T) {
 						},
 					},
 				},
-			},
+			}, c, ctx),
 			want: []interface{}{digest(t, "gcr.io/foo/bar@sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b5")},
 		}, {
 			name: "images",
-			tr: &v1beta1.TaskRun{
+			obj: objects.NewTaskRunObject(&v1beta1.TaskRun{
 				Status: v1beta1.TaskRunStatus{
 					TaskRunStatusFields: v1beta1.TaskRunStatusFields{
 						TaskRunResults: []v1beta1.TaskRunResult{
@@ -246,14 +264,14 @@ func TestOCIArtifact_ExtractObjects(t *testing.T) {
 						},
 					},
 				},
-			},
+			}, c, ctx),
 			want: []interface{}{
 				digest(t, "gcr.io/foo/bar@sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b5"),
 				digest(t, "gcr.io/baz/bar@sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b6"),
 			},
 		}, {
 			name: "images-newline",
-			tr: &v1beta1.TaskRun{
+			obj: objects.NewTaskRunObject(&v1beta1.TaskRun{
 				Status: v1beta1.TaskRunStatus{
 					TaskRunStatusFields: v1beta1.TaskRunStatusFields{
 						TaskRunResults: []v1beta1.TaskRunResult{
@@ -264,7 +282,7 @@ func TestOCIArtifact_ExtractObjects(t *testing.T) {
 						},
 					},
 				},
-			},
+			}, c, ctx),
 			want: []interface{}{
 				digest(t, "gcr.io/foo/bar@sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b5"),
 				digest(t, "gcr.io/baz/bar@sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b6"),
@@ -277,7 +295,7 @@ func TestOCIArtifact_ExtractObjects(t *testing.T) {
 			oa := &OCIArtifact{
 				Logger: logger,
 			}
-			got := oa.ExtractObjects(tt.tr)
+			got := oa.ExtractObjects(tt.obj)
 			sort.Slice(got, func(i, j int) bool {
 				a := got[i].(name.Digest)
 				b := got[j].(name.Digest)
@@ -291,6 +309,8 @@ func TestOCIArtifact_ExtractObjects(t *testing.T) {
 }
 
 func TestExtractOCIImagesFromResults(t *testing.T) {
+	ctx, _ := rtesting.SetupFakeContext(t)
+	c := fakepipelineclient.Get(ctx)
 	tr := &v1beta1.TaskRun{
 		Status: v1beta1.TaskRunStatus{
 			TaskRunStatusFields: v1beta1.TaskRunStatusFields{
@@ -305,12 +325,13 @@ func TestExtractOCIImagesFromResults(t *testing.T) {
 			},
 		},
 	}
+	obj := objects.NewTaskRunObject(tr, c, ctx)
 	want := []interface{}{
 		digest(t, fmt.Sprintf("img1@%s", digest1)),
 		digest(t, fmt.Sprintf("img2@%s", digest2)),
 		digest(t, fmt.Sprintf("img3@%s", digest1)),
 	}
-	got := ExtractOCIImagesFromResults(tr, logtesting.TestLogger(t))
+	got := ExtractOCIImagesFromResults(obj, logtesting.TestLogger(t))
 	sort.Slice(got, func(i, j int) bool {
 		a := got[i].(name.Digest)
 		b := got[j].(name.Digest)

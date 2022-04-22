@@ -19,6 +19,7 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/tektoncd/chains/pkg/chains/formats"
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"go.uber.org/zap"
@@ -26,7 +27,7 @@ import (
 )
 
 type Signable interface {
-	ExtractObjects(obj interface{}) []interface{}
+	ExtractObjects(obj objects.K8sObject) []interface{}
 	StorageBackend(cfg config.Config) sets.String
 	Signer(cfg config.Config) string
 	PayloadFormat(cfg config.Config) formats.PayloadType
@@ -44,8 +45,8 @@ func (ta *TaskRunArtifact) Key(obj interface{}) string {
 	return "taskrun-" + string(tr.UID)
 }
 
-func (ta *TaskRunArtifact) ExtractObjects(obj interface{}) []interface{} {
-	tr := obj.(*v1beta1.TaskRun)
+func (ta *TaskRunArtifact) ExtractObjects(obj objects.K8sObject) []interface{} {
+	tr := obj.GetObject().(*v1beta1.TaskRun)
 	return []interface{}{tr}
 }
 
@@ -78,8 +79,8 @@ func (pa *PipelineRunArtifact) Key(obj interface{}) string {
 	return "pipelinerun-" + string(pr.UID)
 }
 
-func (pa *PipelineRunArtifact) ExtractObjects(obj interface{}) []interface{} {
-	pr := obj.(*v1beta1.PipelineRun)
+func (pa *PipelineRunArtifact) ExtractObjects(obj objects.K8sObject) []interface{} {
+	pr := obj.GetObject().(*v1beta1.PipelineRun)
 	return []interface{}{pr}
 }
 
@@ -113,53 +114,56 @@ type image struct {
 	digest string
 }
 
-func (oa *OCIArtifact) ExtractObjects(obj interface{}) []interface{} {
-	tr := obj.(*v1beta1.TaskRun)
-	imageResourceNames := map[string]*image{}
-	if tr.Status.TaskSpec != nil && tr.Status.TaskSpec.Resources != nil {
-		for _, output := range tr.Status.TaskSpec.Resources.Outputs {
-			if output.Type == v1beta1.PipelineResourceTypeImage {
-				imageResourceNames[output.Name] = &image{}
+func (oa *OCIArtifact) ExtractObjects(obj objects.K8sObject) []interface{} {
+	objs := []interface{}{}
+
+	// TODO: Not applicable to PipelineRuns, should look into a better way to separate this out
+	if tr, ok := obj.GetObject().(*v1beta1.TaskRun); ok {
+		imageResourceNames := map[string]*image{}
+		if tr.Status.TaskSpec != nil && tr.Status.TaskSpec.Resources != nil {
+			for _, output := range tr.Status.TaskSpec.Resources.Outputs {
+				if output.Type == v1beta1.PipelineResourceTypeImage {
+					imageResourceNames[output.Name] = &image{}
+				}
 			}
 		}
-	}
 
-	for _, rr := range tr.Status.ResourcesResult {
-		img, ok := imageResourceNames[rr.ResourceName]
-		if !ok {
-			continue
+		for _, rr := range tr.Status.ResourcesResult {
+			img, ok := imageResourceNames[rr.ResourceName]
+			if !ok {
+				continue
+			}
+			// We have a result for an image!
+			if rr.Key == "url" {
+				img.url = rr.Value
+			} else if rr.Key == "digest" {
+				img.digest = rr.Value
+			}
 		}
-		// We have a result for an image!
-		if rr.Key == "url" {
-			img.url = rr.Value
-		} else if rr.Key == "digest" {
-			img.digest = rr.Value
-		}
-	}
 
-	objs := []interface{}{}
-	for _, image := range imageResourceNames {
-		dgst, err := name.NewDigest(fmt.Sprintf("%s@%s", image.url, image.digest))
-		if err != nil {
-			oa.Logger.Error(err)
-			continue
+		for _, image := range imageResourceNames {
+			dgst, err := name.NewDigest(fmt.Sprintf("%s@%s", image.url, image.digest))
+			if err != nil {
+				oa.Logger.Error(err)
+				continue
+			}
+			objs = append(objs, dgst)
 		}
-		objs = append(objs, dgst)
 	}
 
 	// Now check TaskResults
-	resultImages := ExtractOCIImagesFromResults(tr, oa.Logger)
+	resultImages := ExtractOCIImagesFromResults(obj, oa.Logger)
 	objs = append(objs, resultImages...)
 
 	return objs
 }
 
-func ExtractOCIImagesFromResults(tr *v1beta1.TaskRun, logger *zap.SugaredLogger) []interface{} {
+func ExtractOCIImagesFromResults(obj objects.K8sObject, logger *zap.SugaredLogger) []interface{} {
 	taskResultImages := map[string]*image{}
 	var objs []interface{}
 	urlSuffix := "IMAGE_URL"
 	digestSuffix := "IMAGE_DIGEST"
-	for _, res := range tr.Status.TaskRunResults {
+	for _, res := range obj.GetResults() {
 		if strings.HasSuffix(res.Name, urlSuffix) {
 			p := strings.TrimSuffix(res.Name, urlSuffix)
 			if v, ok := taskResultImages[p]; ok {
@@ -190,7 +194,7 @@ func ExtractOCIImagesFromResults(tr *v1beta1.TaskRun, logger *zap.SugaredLogger)
 	}
 
 	// look for a comma separated list of images
-	for _, key := range tr.Status.TaskRunResults {
+	for _, key := range obj.GetResults() {
 		if key.Name != "IMAGES" {
 			continue
 		}

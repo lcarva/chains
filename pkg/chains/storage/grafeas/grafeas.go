@@ -380,7 +380,8 @@ func (b *Backend) getOCIURI(tr *v1beta1.TaskRun, opts config.StorageOpts) string
 // get the uri of all images for a specific taskrun in the format of `IMAGE_URL@IMAGE_DIGEST`
 func (b *Backend) retrieveAllOCIURIs(tr *v1beta1.TaskRun) []string {
 	result := []string{}
-	images := artifacts.ExtractOCIImagesFromResults(tr, b.logger)
+	trObj := objects.NewTaskRunObject(tr, nil, nil)
+	images := artifacts.ExtractOCIImagesFromResults(trObj, b.logger)
 
 	for _, image := range images {
 		ref := image.(name.Digest)
