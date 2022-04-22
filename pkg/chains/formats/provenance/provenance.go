@@ -26,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/tektoncd/chains/pkg/artifacts"
 	"github.com/tektoncd/chains/pkg/chains/formats"
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/chains/provenance"
 	"github.com/tektoncd/chains/pkg/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
@@ -327,8 +328,8 @@ func gitInfo(tr *v1beta1.TaskRun) (commit string, url string) {
 // calculating a hash of a previous step.
 func GetSubjectDigests(tr *v1beta1.TaskRun, logger *zap.SugaredLogger) []in_toto.Subject {
 	var subjects []in_toto.Subject
-
-	imgs := artifacts.ExtractOCIImagesFromResults(tr, logger)
+	tro := objects.NewTaskRunObject(tr, nil, nil)
+	imgs := artifacts.ExtractOCIImagesFromResults(tro, logger)
 	for _, i := range imgs {
 		if d, ok := i.(name.Digest); ok {
 			subjects = append(subjects, in_toto.Subject{

@@ -26,6 +26,7 @@ import (
 	intoto "github.com/in-toto/in-toto-golang/in_toto"
 	"github.com/tektoncd/chains/pkg/artifacts"
 	"github.com/tektoncd/chains/pkg/chains/formats"
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
@@ -58,20 +59,59 @@ func (i *InTotoIte6) Wrap() bool {
 }
 
 func (i *InTotoIte6) CreatePayload(obj interface{}) (interface{}, error) {
-	var tr *v1beta1.TaskRun
 	switch v := obj.(type) {
 	case *v1beta1.TaskRun:
-		tr = v
+		return i.generateAttestationFromTaskRun(v)
+	case *v1beta1.PipelineRun:
+		return i.generateAttestationFromPipelinerun(v)
 	default:
 		return nil, fmt.Errorf("intoto does not support type: %s", v)
 	}
-	return i.generateAttestationFromTaskRun(tr)
+}
+
+// There most likely exists a better place to put this, adding as another method for now
+// Possibly a generic attestation interface?
+func (i *InTotoIte6) generateAttestationFromPipelinerun(pr *v1beta1.PipelineRun) (interface{}, error) {
+	// We don't need to pass in a client/context here, as we only want access to the original object
+	// Need a better way to differentiate between an abstracted original k8s object and getting the latest values
+	// - Possibly pass client and context in each method call instead of adding it to the struct?
+	pro := objects.NewPipelineRunObject(pr, nil, nil)
+
+	subjects := GetSubjectDigests(pro, i.logger)
+
+	// Adding a sample value to know the attestation is an example
+	invocation := slsa.ProvenanceInvocation{}
+	params := make(map[string]string)
+	params["message"] = "This is an example attestation for pipelineruns, we'll fill in the details later"
+	invocation.Parameters = params
+
+	att := intoto.ProvenanceStatement{
+		StatementHeader: intoto.StatementHeader{
+			Type:          intoto.StatementInTotoV01,
+			PredicateType: slsa.PredicateSLSAProvenance,
+			Subject:       subjects,
+		},
+		Predicate: slsa.ProvenancePredicate{
+			Builder: slsa.ProvenanceBuilder{
+				ID: i.builderID,
+			},
+			BuildType:  tektonID,
+			Invocation: invocation,
+			// BuildConfig: buildConfig(tr),
+			// Metadata:    metadata(tr),
+			// Materials:   materials(tr),
+		},
+	}
+	return att, nil
 }
 
 // generateAttestationFromTaskRun translates a Tekton TaskRun into an in-toto attestation
 // with the slsa-provenance predicate type
 func (i *InTotoIte6) generateAttestationFromTaskRun(tr *v1beta1.TaskRun) (interface{}, error) {
-	subjects := GetSubjectDigests(tr, i.logger)
+	// We only want access to the original object, no need to pass in a client/context
+	tro := objects.NewTaskRunObject(tr, nil, nil)
+
+	subjects := GetSubjectDigests(tro, i.logger)
 
 	att := intoto.ProvenanceStatement{
 		StatementHeader: intoto.StatementHeader{
@@ -137,10 +177,9 @@ func invocation(tr *v1beta1.TaskRun) slsa.ProvenanceInvocation {
 
 // GetSubjectDigests extracts OCI images from the TaskRun based on standard hinting set up
 // It also goes through looking for any PipelineResources of Image type
-func GetSubjectDigests(tr *v1beta1.TaskRun, logger *zap.SugaredLogger) []intoto.Subject {
+func GetSubjectDigests(obj objects.K8sObject, logger *zap.SugaredLogger) []intoto.Subject {
 	var subjects []intoto.Subject
-
-	imgs := artifacts.ExtractOCIImagesFromResults(tr, logger)
+	imgs := artifacts.ExtractOCIImagesFromResults(obj, logger)
 	for _, i := range imgs {
 		if d, ok := i.(name.Digest); ok {
 			subjects = append(subjects, intoto.Subject{
@@ -152,7 +191,13 @@ func GetSubjectDigests(tr *v1beta1.TaskRun, logger *zap.SugaredLogger) []intoto.
 		}
 	}
 
-	if tr.Spec.Resources == nil {
+	// Check if object is a Taskrun, if so search for images used in PipelineResources
+	// Otherwise object is a PipelineRun, where Pipelineresources are not relevant.
+	// PipelineResources have been deprecated so their support has been left out of
+	// the POC for TEP-84
+	// More info: https://tekton.dev/docs/pipelines/resources/
+	tr, ok := obj.GetObject().(*v1beta1.TaskRun)
+	if !ok || tr.Spec.Resources == nil {
 		return subjects
 	}
 

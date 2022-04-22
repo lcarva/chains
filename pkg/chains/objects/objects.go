@@ -10,16 +10,25 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+const (
+	pipelineRunKind = "PipelineRun"
+	taskRunKind     = "TaskRun"
+)
+
 type Annotation struct {
 	Err   error
 	Value string
 	Ok    bool
 }
 
+type Result struct {
+	Name  string
+	Value string
+}
+
 // Represents a generic K8s object
 // This isn't meant to be a final implementation, just one approach
-// Commented out methods will be required for other storage mechanisms,
-//  but we're focused on Tekton for now
+// Many of these methods can be abstracted away further
 type K8sObject interface {
 	GetName() string
 	GetNamespace() string
@@ -28,9 +37,8 @@ type K8sObject interface {
 	GetLatestAnnotation(annotation string) *Annotation
 	GetObject() interface{}
 	Patch(patchBytes []byte) error
-	// GetUID() string
-	// GetGroupVersion() string
-	// GetStatus() interface{}
+	GetResults() []Result          // TODO: Abstract this further to return any field in the status
+	GetServiceAccountName() string // TODO: Abstract this further to return any field in the spec
 }
 
 type TaskRunObject struct {
@@ -56,7 +64,7 @@ func (tro *TaskRunObject) GetNamespace() string {
 }
 
 func (tro *TaskRunObject) GetKind() string {
-	return tro.tr.Kind
+	return taskRunKind
 }
 
 func (tro *TaskRunObject) GetAnnotation(annotation string) *Annotation {
@@ -95,6 +103,21 @@ func (tro *TaskRunObject) Patch(patchBytes []byte) error {
 	return err
 }
 
+func (tro *TaskRunObject) GetResults() []Result {
+	res := []Result{}
+	for _, key := range tro.tr.Status.TaskRunResults {
+		res = append(res, Result{
+			Name:  key.Name,
+			Value: key.Value,
+		})
+	}
+	return res
+}
+
+func (tro *TaskRunObject) GetServiceAccountName() string {
+	return tro.tr.Spec.ServiceAccountName
+}
+
 type PipelineRunObject struct {
 	pr        *v1beta1.PipelineRun
 	clientSet versioned.Interface
@@ -118,7 +141,7 @@ func (pro *PipelineRunObject) GetNamespace() string {
 }
 
 func (pro *PipelineRunObject) GetKind() string {
-	return pro.pr.Kind
+	return pipelineRunKind
 }
 
 func (pro *PipelineRunObject) GetAnnotation(annotation string) *Annotation {
@@ -155,4 +178,19 @@ func (pro *PipelineRunObject) Patch(patchBytes []byte) error {
 	_, err := pro.clientSet.TektonV1beta1().PipelineRuns(pro.pr.Namespace).Patch(
 		pro.ctx, pro.pr.Name, types.MergePatchType, patchBytes, v1.PatchOptions{})
 	return err
+}
+
+func (pro *PipelineRunObject) GetResults() []Result {
+	res := []Result{}
+	for _, key := range pro.pr.Status.PipelineResults {
+		res = append(res, Result{
+			Name:  key.Name,
+			Value: key.Value,
+		})
+	}
+	return res
+}
+
+func (pro *PipelineRunObject) GetServiceAccountName() string {
+	return pro.pr.Spec.ServiceAccountName
 }
