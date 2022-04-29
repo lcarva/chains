@@ -208,7 +208,7 @@ func defaultConfig() *Config {
 				Signer:         "x509",
 			},
 			PipelineRuns: Artifact{
-				Format:         "tekton-pipeline-run",
+				Format:         "tekton",
 				StorageBackend: sets.NewString("tekton"),
 				Signer:         "x509",
 			},
