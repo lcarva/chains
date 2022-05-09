@@ -13,8 +13,7 @@ import (
 )
 
 func GenerateAttestation(builderID string, tr *v1beta1.TaskRun, logger *zap.SugaredLogger) (interface{}, error) {
-	// We only want access to the original object, no need to pass in a client/context
-	tro := objects.NewTaskRunObject(tr, nil, nil)
+	tro := objects.NewTaskRunObject(tr)
 	subjects := util.GetSubjectDigests(tro, logger)
 
 	att := intoto.ProvenanceStatement{

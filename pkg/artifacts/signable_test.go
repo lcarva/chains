@@ -23,10 +23,8 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
-	fakepipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	logtesting "knative.dev/pkg/logging/testing"
-	rtesting "knative.dev/pkg/reconciler/testing"
 )
 
 const (
@@ -37,8 +35,6 @@ const (
 var ignore = []cmp.Option{cmpopts.IgnoreUnexported(name.Registry{}, name.Repository{}, name.Digest{})}
 
 func TestOCIArtifact_ExtractObjects(t *testing.T) {
-	ctx, _ := rtesting.SetupFakeContext(t)
-	c := fakepipelineclient.Get(ctx)
 
 	tests := []struct {
 		name string
@@ -79,7 +75,7 @@ func TestOCIArtifact_ExtractObjects(t *testing.T) {
 						},
 					},
 				},
-			}, c, ctx),
+			}),
 			want: []interface{}{digest(t, "gcr.io/foo/bar@sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b5")},
 		},
 		{
@@ -132,7 +128,7 @@ func TestOCIArtifact_ExtractObjects(t *testing.T) {
 						},
 					},
 				},
-			}, c, ctx),
+			}),
 			want: []interface{}{
 				digest(t, "gcr.io/foo/bar@sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b5"),
 				digest(t, "gcr.io/foo/baz@sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b6"),
@@ -190,7 +186,7 @@ func TestOCIArtifact_ExtractObjects(t *testing.T) {
 						},
 					},
 				},
-			}, c, ctx),
+			}),
 			want: []interface{}{
 				digest(t, "gcr.io/foo/bat@sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b4"),
 				digest(t, "gcr.io/foo/bar@sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b5")},
@@ -249,7 +245,7 @@ func TestOCIArtifact_ExtractObjects(t *testing.T) {
 						},
 					},
 				},
-			}, c, ctx),
+			}),
 			want: []interface{}{digest(t, "gcr.io/foo/bar@sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b5")},
 		}, {
 			name: "images",
@@ -264,7 +260,7 @@ func TestOCIArtifact_ExtractObjects(t *testing.T) {
 						},
 					},
 				},
-			}, c, ctx),
+			}),
 			want: []interface{}{
 				digest(t, "gcr.io/foo/bar@sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b5"),
 				digest(t, "gcr.io/baz/bar@sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b6"),
@@ -282,7 +278,7 @@ func TestOCIArtifact_ExtractObjects(t *testing.T) {
 						},
 					},
 				},
-			}, c, ctx),
+			}),
 			want: []interface{}{
 				digest(t, "gcr.io/foo/bar@sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b5"),
 				digest(t, "gcr.io/baz/bar@sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b6"),
@@ -309,8 +305,6 @@ func TestOCIArtifact_ExtractObjects(t *testing.T) {
 }
 
 func TestExtractOCIImagesFromResults(t *testing.T) {
-	ctx, _ := rtesting.SetupFakeContext(t)
-	c := fakepipelineclient.Get(ctx)
 	tr := &v1beta1.TaskRun{
 		Status: v1beta1.TaskRunStatus{
 			TaskRunStatusFields: v1beta1.TaskRunStatusFields{
@@ -325,7 +319,7 @@ func TestExtractOCIImagesFromResults(t *testing.T) {
 			},
 		},
 	}
-	obj := objects.NewTaskRunObject(tr, c, ctx)
+	obj := objects.NewTaskRunObject(tr)
 	want := []interface{}{
 		digest(t, fmt.Sprintf("img1@%s", digest1)),
 		digest(t, fmt.Sprintf("img2@%s", digest2)),

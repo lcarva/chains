@@ -33,11 +33,14 @@ import (
 	pb "github.com/grafeas/grafeas/proto/v1beta1/grafeas_go_proto"
 	"github.com/tektoncd/chains/pkg/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	"github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
+	fakepipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client/fake"
 	gstatus "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/testing/protocmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	logtesting "knative.dev/pkg/logging/testing"
+	rtesting "knative.dev/pkg/reconciler/testing"
 )
 
 type args struct {
@@ -57,7 +60,8 @@ type testConfig struct {
 // As the filter logic is implemented, we want to make sure it can be trusted before testing store & retrieve.
 func TestBackend_ListOccurrences(t *testing.T) {
 	// get grafeas client
-	ctx := context.Background()
+	ctx, _ := rtesting.SetupFakeContext(t)
+
 	conn, client, err := setupConnection()
 	if err != nil {
 		t.Fatal("Failed to create grafeas client.")
@@ -184,8 +188,8 @@ func TestBackend_StorePayload(t *testing.T) {
 		},
 	}
 
-	ctx := context.Background()
-
+	ctx, _ := rtesting.SetupFakeContext(t)
+	c := fakepipelineclient.Get(ctx)
 	conn, client, err := setupConnection()
 	if err != nil {
 		t.Fatal("Failed to create grafeas client.")
@@ -209,7 +213,7 @@ func TestBackend_StorePayload(t *testing.T) {
 			}
 			// test if the attestation of the taskrun/oci artifact can be successfully stored into grafeas server
 			// and test if payloads and signatures inside the attestation can be retrieved.
-			testInterface(ctx, t, test, backend)
+			testInterface(ctx, c, t, test, backend)
 		})
 	}
 
@@ -227,9 +231,9 @@ func TestBackend_StorePayload(t *testing.T) {
 }
 
 // test attestation storage and retrieval
-func testInterface(ctx context.Context, t *testing.T, test testConfig, backend Backend) {
-	trObj := objects.NewTaskRunObject(test.args.tr, nil, ctx)
-	if err := backend.StorePayload(ctx, trObj, test.args.payload, test.args.signature, test.args.opts); (err != nil) != test.wantErr {
+func testInterface(ctx context.Context, v versioned.Interface, t *testing.T, test testConfig, backend Backend) {
+	trObj := objects.NewTaskRunObject(test.args.tr)
+	if err := backend.StorePayload(ctx, v, trObj, test.args.payload, test.args.signature, test.args.opts); (err != nil) != test.wantErr {
 		t.Fatalf("Backend.StorePayload() failed. error:%v, wantErr:%v", err, test.wantErr)
 	}
 
@@ -240,7 +244,7 @@ func testInterface(ctx context.Context, t *testing.T, test testConfig, backend B
 
 	// check signature
 	expectSignature := map[string][]string{objectIdentifier: {test.args.signature}}
-	gotSignature, err := backend.RetrieveSignatures(ctx, trObj, test.args.opts)
+	gotSignature, err := backend.RetrieveSignatures(ctx, v, trObj, test.args.opts)
 	if err != nil {
 		t.Fatal("Backend.RetrieveSignatures() failed. error:", err)
 	}
@@ -251,7 +255,7 @@ func testInterface(ctx context.Context, t *testing.T, test testConfig, backend B
 
 	// check payload
 	expectPayload := map[string]string{objectIdentifier: string(test.args.payload)}
-	gotPayload, err := backend.RetrievePayloads(ctx, trObj, test.args.opts)
+	gotPayload, err := backend.RetrievePayloads(ctx, v, trObj, test.args.opts)
 	if err != nil {
 		t.Fatalf("RetrievePayloads.RetrievePayloads() failed. error:%v", err)
 	}

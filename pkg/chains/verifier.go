@@ -49,8 +49,7 @@ func (tv *TaskRunVerifier) VerifyTaskRun(ctx context.Context, tr *v1beta1.TaskRu
 		&artifacts.OCIArtifact{Logger: logger},
 	}
 
-	// TODO: Use non-nil clientset?
-	trObj := objects.NewTaskRunObject(tr, nil, ctx)
+	trObj := objects.NewTaskRunObject(tr)
 
 	// Storage
 	allBackends, err := storage.InitializeBackends(ctx, tv.Pipelineclientset, tv.KubeClient, logger, cfg)
@@ -73,11 +72,11 @@ func (tv *TaskRunVerifier) VerifyTaskRun(ctx context.Context, tr *v1beta1.TaskRu
 
 		for _, backend := range signableType.StorageBackend(cfg).List() {
 			b := allBackends[backend]
-			signatures, err := b.RetrieveSignatures(ctx, trObj, config.StorageOpts{})
+			signatures, err := b.RetrieveSignatures(ctx, tv.Pipelineclientset, trObj, config.StorageOpts{})
 			if err != nil {
 				return err
 			}
-			payload, err := b.RetrievePayloads(ctx, trObj, config.StorageOpts{})
+			payload, err := b.RetrievePayloads(ctx, tv.Pipelineclientset, trObj, config.StorageOpts{})
 			if err != nil {
 				return err
 			}
