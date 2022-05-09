@@ -53,7 +53,7 @@ func NewStorageBackend(ps versioned.Interface, logger *zap.SugaredLogger) *Backe
 }
 
 // StorePayload implements the Payloader interface.
-func (b *Backend) StorePayload(ctx context.Context, obj objects.K8sObject, rawPayload []byte, signature string, opts config.StorageOpts) error {
+func (b *Backend) StorePayload(ctx context.Context, clientSet versioned.Interface, obj objects.K8sObject, rawPayload []byte, signature string, opts config.StorageOpts) error {
 	b.logger.Infof("Storing payload on %s/%s/%s", obj.GetNamespace(), obj.GetKind(), obj.GetName())
 
 	// Use patch instead of update to prevent race conditions.
@@ -69,7 +69,7 @@ func (b *Backend) StorePayload(ctx context.Context, obj objects.K8sObject, rawPa
 	}
 	// if _, err := b.pipelienclientset.TektonV1beta1().TaskRuns(tr.Namespace).Patch(
 	// 	return err
-	patchErr := obj.Patch(patchBytes)
+	patchErr := obj.Patch(ctx, clientSet, patchBytes)
 	if patchErr != nil {
 		return patchErr
 	}
@@ -81,12 +81,12 @@ func (b *Backend) Type() string {
 }
 
 // retrieveAnnotationValue retrieve the value of an annotation and base64 decode it if needed.
-func (b *Backend) retrieveAnnotationValue(ctx context.Context, obj objects.K8sObject, annotationKey string, decode bool) (string, error) {
+func (b *Backend) retrieveAnnotationValue(ctx context.Context, clientSet versioned.Interface, obj objects.K8sObject, annotationKey string, decode bool) (string, error) {
 	// Retrieve the TaskRun.
 	b.logger.Infof("Retrieving annotation %q on %s/%s/%s", annotationKey, obj.GetNamespace(), obj.GetKind(), obj.GetName())
 
 	var annotationValue string
-	ann := obj.GetLatestAnnotation(annotationKey)
+	ann := obj.GetLatestAnnotation(ctx, clientSet, annotationKey)
 
 	// Ensure it exists.
 	if ann.Ok {
@@ -106,10 +106,10 @@ func (b *Backend) retrieveAnnotationValue(ctx context.Context, obj objects.K8sOb
 }
 
 // RetrieveSignature retrieve the signature stored in the taskrun.
-func (b *Backend) RetrieveSignatures(ctx context.Context, obj objects.K8sObject, opts config.StorageOpts) (map[string][]string, error) {
+func (b *Backend) RetrieveSignatures(ctx context.Context, clientSet versioned.Interface, obj objects.K8sObject, opts config.StorageOpts) (map[string][]string, error) {
 	b.logger.Infof("Retrieving signature on %s/%s/%s", obj.GetNamespace(), obj.GetKind(), obj.GetName())
 	signatureAnnotation := sigName(opts)
-	signature, err := b.retrieveAnnotationValue(ctx, obj, signatureAnnotation, true)
+	signature, err := b.retrieveAnnotationValue(ctx, clientSet, obj, signatureAnnotation, true)
 	if err != nil {
 		return nil, err
 	}
@@ -139,10 +139,10 @@ func (b *Backend) RetrieveSignatures(ctx context.Context, obj objects.K8sObject,
 }
 
 // RetrievePayload retrieve the payload stored in the taskrun.
-func (b *Backend) RetrievePayloads(ctx context.Context, obj objects.K8sObject, opts config.StorageOpts) (map[string]string, error) {
+func (b *Backend) RetrievePayloads(ctx context.Context, clientSet versioned.Interface, obj objects.K8sObject, opts config.StorageOpts) (map[string]string, error) {
 	b.logger.Infof("Retrieving payload on %s/%s/%s", obj.GetNamespace(), obj.GetKind(), obj.GetName())
 	payloadAnnotation := payloadName(opts)
-	payload, err := b.retrieveAnnotationValue(ctx, obj, payloadAnnotation, true)
+	payload, err := b.retrieveAnnotationValue(ctx, clientSet, obj, payloadAnnotation, true)
 	if err != nil {
 		return nil, err
 	}

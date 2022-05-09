@@ -158,12 +158,7 @@ func TestBackend_StorePayload(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Trying to create context fails with "Unable to fetch labelkey from context."
-			// We don't need the context or client so we'll just pass nil for now
-			// ctx, _ := rtesting.SetupFakeContext(t)
-			// c := fakepipelineclient.Get(ctx)
-			// obj := objects.NewTaskRunObject(tt.fields.tr, c, ctx)
-			trObj := objects.NewTaskRunObject(tt.fields.tr, nil, nil)
+			trObj := objects.NewTaskRunObject(tt.fields.tr)
 			b := &Backend{
 				logger: logtesting.TestLogger(t),
 				getAuthenticator: func(_ context.Context, _ objects.K8sObject, _ kubernetes.Interface) (remote.Option, error) {
@@ -174,7 +169,11 @@ func TestBackend_StorePayload(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to marshal: %v", err)
 			}
-			if err := b.StorePayload(ctx, trObj, rawPayload, tt.args.signature, tt.args.storageOpts); (err != nil) != tt.wantErr {
+			// TODO: Passing in fake client with the following fails with "Unable to fetch labelkey from context.",
+			// need to diagnose why. Client isn't used so we can get away with passing nil for now.
+			// 	ctx, _ := rtesting.SetupFakeContext(t)
+			// c := fakepipelineclient.Get(ctx)
+			if err := b.StorePayload(ctx, nil, trObj, rawPayload, tt.args.signature, tt.args.storageOpts); (err != nil) != tt.wantErr {
 				t.Errorf("Backend.StorePayload() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

@@ -280,7 +280,7 @@ func TestGetSubjectDigests(t *testing.T) {
 			},
 		},
 	}
-	tro := objects.NewTaskRunObject(tr, nil, nil)
+	tro := objects.NewTaskRunObject(tr)
 	got := util.GetSubjectDigests(tro, logtesting.TestLogger(t))
 	if !reflect.DeepEqual(expected, got) {
 		if d := cmp.Diff(expected, got); d != "" {

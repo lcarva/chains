@@ -97,14 +97,12 @@ func TestRetryAvailble(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			ctx, _ := rtesting.SetupFakeContext(t)
-			c := fakepipelineclient.Get(ctx)
 			tr := &v1beta1.TaskRun{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: test.annotations,
 				},
 			}
-			trObj := objects.NewTaskRunObject(tr, c, ctx)
+			trObj := objects.NewTaskRunObject(tr)
 			got := RetryAvailable(trObj)
 			if got != test.expected {
 				t.Fatalf("RetryAvailble() got %v expected %v", got, test.expected)
@@ -124,7 +122,7 @@ func TestAddRetry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	trObj := objects.NewTaskRunObject(tr, c, ctx)
+	trObj := objects.NewTaskRunObject(tr)
 
 	// run it through AddRetry, make sure annotation is added
 	if err := AddRetry(ctx, trObj, c, nil); err != nil {
@@ -141,7 +139,7 @@ func TestAddRetry(t *testing.T) {
 	}
 
 	// run it again, make sure we see an increase
-	trObj = objects.NewTaskRunObject(signed, c, ctx)
+	trObj = objects.NewTaskRunObject(signed)
 	if err := AddRetry(ctx, trObj, c, nil); err != nil {
 		t.Fatal(err)
 	}

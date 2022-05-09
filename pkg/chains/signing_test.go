@@ -25,6 +25,7 @@ import (
 	"github.com/tektoncd/chains/pkg/chains/storage"
 	"github.com/tektoncd/chains/pkg/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	versioned "github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
 	fakepipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client/fake"
 	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,7 +48,7 @@ func TestMarkSigned(t *testing.T) {
 			},
 		},
 	}
-	trObj := objects.NewTaskRunObject(tr, c, ctx)
+	trObj := objects.NewTaskRunObject(tr)
 	if _, err := c.TektonV1beta1().TaskRuns(tr.Namespace).Create(ctx, tr, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +111,7 @@ func TestMarkFailed(t *testing.T) {
 	}
 
 	// Test HandleRetry, should mark it as failed
-	trObj := objects.NewTaskRunObject(tr, c, ctx)
+	trObj := objects.NewTaskRunObject(tr)
 	if err := HandleRetry(ctx, trObj, c, nil); err != nil {
 		t.Errorf("HandleRetry() error = %v", err)
 	}
@@ -366,7 +367,7 @@ type mockBackend struct {
 }
 
 // StorePayload implements the Payloader interface.
-func (b *mockBackend) StorePayload(ctx context.Context, _ objects.K8sObject, rawPayload []byte, signature string, opts config.StorageOpts) error {
+func (b *mockBackend) StorePayload(ctx context.Context, _ versioned.Interface, _ objects.K8sObject, rawPayload []byte, signature string, opts config.StorageOpts) error {
 	if b.shouldErr {
 		return errors.New("mock error storing")
 	}
@@ -378,10 +379,10 @@ func (b *mockBackend) Type() string {
 	return b.backendType
 }
 
-func (b *mockBackend) RetrievePayloads(ctx context.Context, _ objects.K8sObject, opts config.StorageOpts) (map[string]string, error) {
+func (b *mockBackend) RetrievePayloads(ctx context.Context, _ versioned.Interface, _ objects.K8sObject, opts config.StorageOpts) (map[string]string, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (b *mockBackend) RetrieveSignatures(ctx context.Context, _ objects.K8sObject, opts config.StorageOpts) (map[string][]string, error) {
+func (b *mockBackend) RetrieveSignatures(ctx context.Context, _ versioned.Interface, _ objects.K8sObject, opts config.StorageOpts) (map[string][]string, error) {
 	return nil, fmt.Errorf("not implemented")
 }
