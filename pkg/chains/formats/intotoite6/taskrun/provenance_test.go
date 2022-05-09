@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package intotoite6
+package taskrun
 
 import (
 	"reflect"
@@ -27,6 +27,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/google/go-cmp/cmp"
 	"github.com/in-toto/in-toto-golang/in_toto"
+	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/util"
 	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/apis/resource/v1alpha1"
@@ -280,7 +281,7 @@ func TestGetSubjectDigests(t *testing.T) {
 		},
 	}
 	tro := objects.NewTaskRunObject(tr, nil, nil)
-	got := GetSubjectDigests(tro, logtesting.TestLogger(t))
+	got := util.GetSubjectDigests(tro, logtesting.TestLogger(t))
 	if !reflect.DeepEqual(expected, got) {
 		if d := cmp.Diff(expected, got); d != "" {
 			t.Log(d)
