@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/tektoncd/chains/pkg/chains/formats"
+	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/taskrun"
 	"github.com/tektoncd/chains/pkg/config"
 
 	"github.com/google/go-cmp/cmp"
@@ -76,8 +77,8 @@ func TestCreatePayload1(t *testing.T) {
 				ID: "test_builder-1",
 			},
 			BuildType: "https://tekton.dev/attestations/chains@v2",
-			BuildConfig: BuildConfig{
-				Steps: []Step{
+			BuildConfig: taskrun.BuildConfig{
+				Steps: []taskrun.Step{
 					{
 						Arguments: []string(nil),
 						Environment: map[string]interface{}{
@@ -137,8 +138,8 @@ func TestCreatePayload2(t *testing.T) {
 				Parameters: map[string]string{},
 			},
 			BuildType: "https://tekton.dev/attestations/chains@v2",
-			BuildConfig: BuildConfig{
-				Steps: []Step{
+			BuildConfig: taskrun.BuildConfig{
+				Steps: []taskrun.Step{
 					{
 						Arguments: []string(nil),
 						Environment: map[string]interface{}{
@@ -216,8 +217,8 @@ func TestMultipleSubjects(t *testing.T) {
 			Invocation: slsa.ProvenanceInvocation{
 				Parameters: map[string]string{},
 			},
-			BuildConfig: BuildConfig{
-				Steps: []Step{
+			BuildConfig: taskrun.BuildConfig{
+				Steps: []taskrun.Step{
 					{
 						Arguments: []string(nil),
 						Environment: map[string]interface{}{

@@ -114,7 +114,7 @@ func TestParse(t *testing.T) {
 						Signer:         "x509",
 					},
 					PipelineRuns: Artifact{
-						Format:         "tekton-pipeline-run",
+						Format:         "tekton",
 						Signer:         "x509",
 						StorageBackend: sets.NewString("tekton"),
 					},
@@ -146,7 +146,7 @@ func TestParse(t *testing.T) {
 						Signer:         "x509",
 					},
 					PipelineRuns: Artifact{
-						Format:         "tekton-pipeline-run",
+						Format:         "tekton",
 						Signer:         "x509",
 						StorageBackend: sets.NewString("tekton"),
 					},
@@ -178,7 +178,7 @@ func TestParse(t *testing.T) {
 						Signer:         "x509",
 					},
 					PipelineRuns: Artifact{
-						Format:         "tekton-pipeline-run",
+						Format:         "tekton",
 						Signer:         "x509",
 						StorageBackend: sets.NewString("tekton"),
 					},
@@ -210,7 +210,7 @@ func TestParse(t *testing.T) {
 						Signer:         "x509",
 					},
 					PipelineRuns: Artifact{
-						Format:         "tekton-pipeline-run",
+						Format:         "tekton",
 						Signer:         "x509",
 						StorageBackend: sets.NewString("tekton"),
 					},
@@ -242,7 +242,7 @@ func TestParse(t *testing.T) {
 						Signer:         "x509",
 					},
 					PipelineRuns: Artifact{
-						Format:         "tekton-pipeline-run",
+						Format:         "tekton",
 						Signer:         "x509",
 						StorageBackend: sets.NewString("tekton"),
 					},
@@ -274,7 +274,7 @@ func TestParse(t *testing.T) {
 						Signer:         "x509",
 					},
 					PipelineRuns: Artifact{
-						Format:         "tekton-pipeline-run",
+						Format:         "tekton",
 						Signer:         "x509",
 						StorageBackend: sets.NewString("tekton"),
 					},
@@ -306,7 +306,7 @@ func TestParse(t *testing.T) {
 						Signer:         "x509",
 					},
 					PipelineRuns: Artifact{
-						Format:         "tekton-pipeline-run",
+						Format:         "tekton",
 						Signer:         "x509",
 						StorageBackend: sets.NewString("tekton"),
 					},
@@ -338,7 +338,7 @@ func TestParse(t *testing.T) {
 						StorageBackend: sets.NewString("tekton"),
 					},
 					PipelineRuns: Artifact{
-						Format:         "tekton-pipeline-run",
+						Format:         "tekton",
 						Signer:         "x509",
 						StorageBackend: sets.NewString("tekton"),
 					},
@@ -370,7 +370,7 @@ func TestParse(t *testing.T) {
 						StorageBackend: sets.NewString("tekton"),
 					},
 					PipelineRuns: Artifact{
-						Format:         "tekton-pipeline-run",
+						Format:         "tekton",
 						Signer:         "x509",
 						StorageBackend: sets.NewString("tekton"),
 					},
@@ -404,7 +404,7 @@ func TestParse(t *testing.T) {
 						StorageBackend: sets.NewString("tekton"),
 					},
 					PipelineRuns: Artifact{
-						Format:         "tekton-pipeline-run",
+						Format:         "tekton",
 						Signer:         "x509",
 						StorageBackend: sets.NewString("tekton"),
 					},
@@ -439,7 +439,7 @@ func TestParse(t *testing.T) {
 						StorageBackend: sets.NewString("tekton"),
 					},
 					PipelineRuns: Artifact{
-						Format:         "tekton-pipeline-run",
+						Format:         "tekton",
 						Signer:         "x509",
 						StorageBackend: sets.NewString("tekton"),
 					},
@@ -477,7 +477,7 @@ func TestParse(t *testing.T) {
 						StorageBackend: sets.NewString("tekton"),
 					},
 					PipelineRuns: Artifact{
-						Format:         "tekton-pipeline-run",
+						Format:         "tekton",
 						Signer:         "x509",
 						StorageBackend: sets.NewString("tekton"),
 					},
@@ -515,7 +515,7 @@ func TestParse(t *testing.T) {
 						StorageBackend: sets.NewString("tekton"),
 					},
 					PipelineRuns: Artifact{
-						Format:         "tekton-pipeline-run",
+						Format:         "tekton",
 						Signer:         "x509",
 						StorageBackend: sets.NewString("tekton"),
 					},
