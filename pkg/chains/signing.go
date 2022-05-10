@@ -130,7 +130,7 @@ func (ts *TaskRunSigner) Sign(ctx context.Context, object interface{}) error {
 	}
 
 	tr := object.(*v1beta1.TaskRun)
-	trObj := objects.NewTaskRunObject(tr, ts.Pipelineclientset, ctx)
+	trObj := objects.NewTaskRunObject(tr)
 
 	signers := allSigners(ctx, ts.SecretPath, cfg, logger)
 
@@ -207,7 +207,7 @@ func (ts *TaskRunSigner) Sign(ctx context.Context, object interface{}) error {
 					Chain:         signer.Chain(),
 					PayloadFormat: payloadFormat,
 				}
-				if err := b.StorePayload(ctx, trObj, rawPayload, string(signature), storageOpts); err != nil {
+				if err := b.StorePayload(ctx, ts.Pipelineclientset, trObj, rawPayload, string(signature), storageOpts); err != nil {
 					logger.Error(err)
 					merr = multierror.Append(merr, err)
 				}
@@ -341,7 +341,7 @@ func (ps *PipelineRunSigner) Sign(ctx context.Context, object interface{}) error
 					Chain:         signer.Chain(),
 					PayloadFormat: payloadFormat,
 				}
-				if err := b.StorePayload(ctx, prObj, rawPayload, string(signature), storageOpts); err != nil {
+				if err := b.StorePayload(ctx, ps.Pipelineclientset, prObj, rawPayload, string(signature), storageOpts); err != nil {
 					logger.Error(err)
 					merr = multierror.Append(merr, err)
 				}

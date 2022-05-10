@@ -102,7 +102,7 @@ func AddAnnotation(ctx context.Context, obj objects.K8sObject, ps versioned.Inte
 	if err != nil {
 		return err
 	}
-	err = obj.Patch(patchBytes)
+	err = obj.Patch(ctx, ps, patchBytes)
 	if err != nil {
 		return err
 	}

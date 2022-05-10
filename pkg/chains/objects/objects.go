@@ -34,24 +34,20 @@ type K8sObject interface {
 	GetNamespace() string
 	GetKind() string
 	GetAnnotation(annotation string) *Annotation
-	GetLatestAnnotation(annotation string) *Annotation
+	GetLatestAnnotation(ctx context.Context, clientSet versioned.Interface, annotation string) *Annotation
 	GetObject() interface{}
-	Patch(patchBytes []byte) error
+	Patch(ctx context.Context, clientSet versioned.Interface, patchBytes []byte) error
 	GetResults() []Result          // TODO: Abstract this further to return any field in the status
 	GetServiceAccountName() string // TODO: Abstract this further to return any field in the spec
 }
 
 type TaskRunObject struct {
-	tr        *v1beta1.TaskRun
-	clientSet versioned.Interface
-	ctx       context.Context
+	tr *v1beta1.TaskRun
 }
 
-func NewTaskRunObject(tr *v1beta1.TaskRun, clientSet versioned.Interface, ctx context.Context) *TaskRunObject {
+func NewTaskRunObject(tr *v1beta1.TaskRun) *TaskRunObject {
 	return &TaskRunObject{
-		tr:        tr,
-		clientSet: clientSet,
-		ctx:       ctx,
+		tr: tr,
 	}
 }
 
@@ -76,8 +72,8 @@ func (tro *TaskRunObject) GetAnnotation(annotation string) *Annotation {
 	}
 }
 
-func (tro *TaskRunObject) GetLatestAnnotation(annotation string) *Annotation {
-	tr, err := tro.clientSet.TektonV1beta1().TaskRuns(tro.tr.Namespace).Get(tro.ctx, tro.tr.Name, v1.GetOptions{})
+func (tro *TaskRunObject) GetLatestAnnotation(ctx context.Context, clientSet versioned.Interface, annotation string) *Annotation {
+	tr, err := clientSet.TektonV1beta1().TaskRuns(tro.tr.Namespace).Get(ctx, tro.tr.Name, v1.GetOptions{})
 	if err != nil {
 		return &Annotation{
 			Err:   fmt.Errorf("error retrieving taskrun: %s", err),
@@ -97,9 +93,9 @@ func (tro *TaskRunObject) GetObject() interface{} {
 	return tro.tr
 }
 
-func (tro *TaskRunObject) Patch(patchBytes []byte) error {
-	_, err := tro.clientSet.TektonV1beta1().TaskRuns(tro.tr.Namespace).Patch(
-		tro.ctx, tro.tr.Name, types.MergePatchType, patchBytes, v1.PatchOptions{})
+func (tro *TaskRunObject) Patch(ctx context.Context, clientSet versioned.Interface, patchBytes []byte) error {
+	_, err := clientSet.TektonV1beta1().TaskRuns(tro.tr.Namespace).Patch(
+		ctx, tro.tr.Name, types.MergePatchType, patchBytes, v1.PatchOptions{})
 	return err
 }
 
@@ -153,8 +149,8 @@ func (pro *PipelineRunObject) GetAnnotation(annotation string) *Annotation {
 	}
 }
 
-func (pro *PipelineRunObject) GetLatestAnnotation(annotation string) *Annotation {
-	tr, err := pro.clientSet.TektonV1beta1().PipelineRuns(pro.pr.Namespace).Get(pro.ctx, pro.pr.Name, v1.GetOptions{})
+func (pro *PipelineRunObject) GetLatestAnnotation(ctx context.Context, clientSet versioned.Interface, annotation string) *Annotation {
+	tr, err := clientSet.TektonV1beta1().PipelineRuns(pro.pr.Namespace).Get(ctx, pro.pr.Name, v1.GetOptions{})
 	if err != nil {
 		return &Annotation{
 			Err:   fmt.Errorf("error retrieving pipelinerun: %s", err),
@@ -174,9 +170,9 @@ func (pro *PipelineRunObject) GetObject() interface{} {
 	return pro.pr
 }
 
-func (pro *PipelineRunObject) Patch(patchBytes []byte) error {
-	_, err := pro.clientSet.TektonV1beta1().PipelineRuns(pro.pr.Namespace).Patch(
-		pro.ctx, pro.pr.Name, types.MergePatchType, patchBytes, v1.PatchOptions{})
+func (pro *PipelineRunObject) Patch(ctx context.Context, clientSet versioned.Interface, patchBytes []byte) error {
+	_, err := clientSet.TektonV1beta1().PipelineRuns(pro.pr.Namespace).Patch(
+		ctx, pro.pr.Name, types.MergePatchType, patchBytes, v1.PatchOptions{})
 	return err
 }
 

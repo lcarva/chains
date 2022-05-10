@@ -74,8 +74,8 @@ func TestBackend_StorePayload(t *testing.T) {
 			}
 			opts := config.StorageOpts{Key: "mockpayload"}
 			mockSignature := "mocksignature"
-			trObj := objects.NewTaskRunObject(tr, c, ctx)
-			if err := b.StorePayload(ctx, trObj, payload, mockSignature, opts); (err != nil) != tt.wantErr {
+			trObj := objects.NewTaskRunObject(tr)
+			if err := b.StorePayload(ctx, c, trObj, payload, mockSignature, opts); (err != nil) != tt.wantErr {
 				t.Errorf("Backend.StorePayload() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
@@ -85,7 +85,7 @@ func TestBackend_StorePayload(t *testing.T) {
 			}
 
 			payloadAnnotation := payloadName(opts)
-			payloads, err := b.RetrievePayloads(ctx, trObj, opts)
+			payloads, err := b.RetrievePayloads(ctx, c, trObj, opts)
 			if err != nil {
 				t.Errorf("error base64 decoding: %v", err)
 			}
@@ -102,7 +102,7 @@ func TestBackend_StorePayload(t *testing.T) {
 
 			// Compare the signature.
 			signatureAnnotation := sigName(opts)
-			sigs, err := b.RetrieveSignatures(ctx, trObj, opts)
+			sigs, err := b.RetrieveSignatures(ctx, c, trObj, opts)
 			if err != nil {
 				t.Fatal(err)
 			}

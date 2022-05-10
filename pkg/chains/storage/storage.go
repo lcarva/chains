@@ -31,11 +31,11 @@ import (
 
 // Backend is an interface to store a chains Payload
 type Backend interface {
-	StorePayload(ctx context.Context, obj objects.K8sObject, rawPayload []byte, signature string, opts config.StorageOpts) error
+	StorePayload(ctx context.Context, clientSet versioned.Interface, obj objects.K8sObject, rawPayload []byte, signature string, opts config.StorageOpts) error
 	// RetrievePayloads maps [ref]:[payload] for a TaskRun
-	RetrievePayloads(ctx context.Context, obj objects.K8sObject, opts config.StorageOpts) (map[string]string, error)
+	RetrievePayloads(ctx context.Context, clientSet versioned.Interface, obj objects.K8sObject, opts config.StorageOpts) (map[string]string, error)
 	// RetrieveSignatures maps [ref]:[list of signatures] for a TaskRun
-	RetrieveSignatures(ctx context.Context, obj objects.K8sObject, opts config.StorageOpts) (map[string][]string, error)
+	RetrieveSignatures(ctx context.Context, clientSet versioned.Interface, obj objects.K8sObject, opts config.StorageOpts) (map[string][]string, error)
 	// Type is the string representation of the backend
 	Type() string
 }
@@ -68,12 +68,6 @@ func InitializeBackends(ctx context.Context, ps versioned.Interface, kc kubernet
 			backends[backendType] = tekton.NewStorageBackend(ps, logger)
 		case oci.StorageBackendOCI:
 			ociBackend := oci.NewStorageBackend(ctx, logger, kc, cfg)
-			// =======
-			// 			ociBackend, err := oci.NewStorageBackend(ctx, logger, kc, obj, cfg)
-			// 			if err != nil {
-			// 				return nil, err
-			// 			}
-			// >>>>>>> 1eec2732 (Adding OCI storage option to Pipeline attestations)
 			backends[backendType] = ociBackend
 		case docdb.StorageTypeDocDB:
 			docdbBackend, err := docdb.NewStorageBackend(ctx, logger, cfg)

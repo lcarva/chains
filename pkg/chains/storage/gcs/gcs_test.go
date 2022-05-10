@@ -24,13 +24,16 @@ import (
 
 	"github.com/tektoncd/chains/pkg/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	fakepipelineclient "github.com/tektoncd/pipeline/pkg/client/injection/client/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	logtesting "knative.dev/pkg/logging/testing"
+	rtesting "knative.dev/pkg/reconciler/testing"
 )
 
 func TestBackend_StorePayload(t *testing.T) {
-	ctx := context.Background()
+	ctx, _ := rtesting.SetupFakeContext(t)
+	c := fakepipelineclient.Get(ctx)
 
 	type args struct {
 		tr        *v1beta1.TaskRun
@@ -85,14 +88,14 @@ func TestBackend_StorePayload(t *testing.T) {
 				reader: mockGcsRead,
 				cfg:    config.Config{Storage: config.StorageConfigs{GCS: config.GCSStorageConfig{Bucket: "foo"}}},
 			}
-			trObj := objects.NewTaskRunObject(tt.args.tr, nil, ctx)
-			if err := b.StorePayload(ctx, trObj, tt.args.signed, tt.args.signature, tt.args.opts); (err != nil) != tt.wantErr {
+			trObj := objects.NewTaskRunObject(tt.args.tr)
+			if err := b.StorePayload(ctx, c, trObj, tt.args.signed, tt.args.signature, tt.args.opts); (err != nil) != tt.wantErr {
 				t.Errorf("Backend.StorePayload() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
 			objectSig := sigName(tt.args.tr, tt.args.opts)
 			objectPayload := payloadName(tt.args.tr, tt.args.opts)
-			got, err := b.RetrieveSignatures(ctx, trObj, tt.args.opts)
+			got, err := b.RetrieveSignatures(ctx, c, trObj, tt.args.opts)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -100,7 +103,7 @@ func TestBackend_StorePayload(t *testing.T) {
 				t.Errorf("wrong signature, expected %q, got %q", tt.args.signature, got[objectSig][0])
 			}
 			var gotPayload map[string]string
-			gotPayload, err = b.RetrievePayloads(ctx, trObj, tt.args.opts)
+			gotPayload, err = b.RetrievePayloads(ctx, c, trObj, tt.args.opts)
 			if err != nil {
 				t.Fatal(err)
 			}
