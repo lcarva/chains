@@ -99,6 +99,10 @@ func buildConfig(pr *v1beta1.PipelineRun) BuildConfig {
 
 	for _, tr := range pr.Status.PipelineSpec.Tasks {
 		trStatus := trStatuses[tr.Name]
+		if trStatus == nil {
+			// Ignore Tasks that did not execute during the PipelineRun.
+			continue
+		}
 		steps := []Step{}
 		for i, step := range trStatus.Status.Steps {
 			steps = append(steps, Step{
