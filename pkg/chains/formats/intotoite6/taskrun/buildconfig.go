@@ -17,15 +17,14 @@ limitations under the License.
 package taskrun
 
 import (
-	"strings"
-
+	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/util"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 )
 
 // BuildConfig is the custom Chains format to fill out the
 // "buildConfig" section of the slsa-provenance predicate
 type BuildConfig struct {
-	Steps []Step `json:"steps"`
+	Steps []util.StepAttestation `json:"steps"`
 }
 
 // Step corresponds to one step in the TaskRun
@@ -37,38 +36,21 @@ type Step struct {
 }
 
 func buildConfig(tr *v1beta1.TaskRun) BuildConfig {
-	steps := []Step{}
-	for _, step := range tr.Status.Steps {
-		s := Step{}
-		c := container(step, tr)
-		// get the entrypoint
-		entrypoint := strings.Join(c.Command, " ")
-		if c.Script != "" {
-			entrypoint = c.Script
-		}
-		s.EntryPoint = entrypoint
-		s.Arguments = c.Args
-
-		// env comprises of:
-		env := map[string]interface{}{}
-		env["image"] = step.ImageID
-		env["container"] = step.Name
-		s.Environment = env
-
-		// append to all of the steps
-		steps = append(steps, s)
+	attestations := []util.StepAttestation{}
+	for _, stepState := range tr.Status.Steps {
+		step := stepFromTaskRun(stepState.Name, tr)
+		attestations = append(attestations, util.AttestStep(step, &stepState))
 	}
-	return BuildConfig{Steps: steps}
+	return BuildConfig{Steps: attestations}
 }
 
-func container(stepState v1beta1.StepState, tr *v1beta1.TaskRun) v1beta1.Step {
-	name := stepState.Name
+func stepFromTaskRun(name string, tr *v1beta1.TaskRun) *v1beta1.Step {
 	if tr.Status.TaskSpec != nil {
 		for _, s := range tr.Status.TaskSpec.Steps {
 			if s.Name == name {
-				return s
+				return &s
 			}
 		}
 	}
-	return v1beta1.Step{}
+	return &v1beta1.Step{}
 }

@@ -19,18 +19,11 @@ type BuildConfig struct {
 }
 
 type Task struct {
-	Name       string    `json:"name,omitempty"`
-	StartedAt  time.Time `json:"startedAt,omitempty"`
-	FinishedAt time.Time `json:"finishedAt,omitempty"`
-	Status     string    `json:"status,omitempty"`
-	Steps      []Step    `json:"steps,omitempty"`
-}
-
-type Step struct {
-	StepState v1beta1.StepState `json:"stepState,omitempty"`
-	Command   []string          `json:"command,omitempty"`
-	Arguments []string          `json:"arguments,omitempty"`
-	Script    string            `json:"script,omitempty"`
+	Name       string                 `json:"name,omitempty"`
+	StartedAt  time.Time              `json:"startedAt,omitempty"`
+	FinishedAt time.Time              `json:"finishedAt,omitempty"`
+	Status     string                 `json:"status,omitempty"`
+	Steps      []util.StepAttestation `json:"steps,omitempty"`
 }
 
 func GenerateAttestation(builderID string, pr *v1beta1.PipelineRun, logger *zap.SugaredLogger) (interface{}, error) {
@@ -108,14 +101,10 @@ func buildConfig(pr *v1beta1.PipelineRun) BuildConfig {
 			// Ignore Tasks that did not execute during the PipelineRun.
 			continue
 		}
-		steps := []Step{}
+		steps := []util.StepAttestation{}
 		for i, step := range trStatus.Status.Steps {
-			steps = append(steps, Step{
-				StepState: step,
-				Command:   trStatus.Status.TaskSpec.Steps[i].Command,
-				Arguments: trStatus.Status.TaskSpec.Steps[i].Args,
-				Script:    trStatus.Status.TaskSpec.Steps[i].Script,
-			})
+			stepState := trStatus.Status.TaskSpec.Steps[i]
+			steps = append(steps, util.AttestStep(&stepState, &step))
 		}
 		task := Task{
 			Name:       trStatus.PipelineTaskName,
