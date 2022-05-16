@@ -22,6 +22,7 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/google/go-cmp/cmp"
+	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/util"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 )
 
@@ -62,7 +63,7 @@ status:
 	}
 
 	expected := BuildConfig{
-		Steps: []Step{
+		Steps: []util.StepAttestation{
 			{
 				EntryPoint: "",
 				Environment: map[string]interface{}{
