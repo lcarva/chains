@@ -1,7 +1,6 @@
 package pipelinerun
 
 import (
-	"fmt"
 	"time"
 
 	intoto "github.com/in-toto/in-toto-golang/in_toto"
@@ -15,17 +14,18 @@ import (
 )
 
 type BuildConfig struct {
-	Tasks []Task `json:"tasks"`
+	Tasks []TaskAttestation `json:"tasks"`
 }
 
-type Task struct {
-	Name       string                 `json:"name,omitempty"`
-	After      []string               `json:"after,omitempty"`
-	Ref        v1beta1.TaskRef        `json:"ref,omitempty"`
-	StartedOn  time.Time              `json:"startedOn,omitempty"`
-	FinishedOn time.Time              `json:"finishedOn,omitempty"`
-	Status     string                 `json:"status,omitempty"`
-	Steps      []util.StepAttestation `json:"steps,omitempty"`
+type TaskAttestation struct {
+	Name       string                    `json:"name,omitempty"`
+	After      []string                  `json:"after,omitempty"`
+	Ref        v1beta1.TaskRef           `json:"ref,omitempty"`
+	StartedOn  time.Time                 `json:"startedOn,omitempty"`
+	FinishedOn time.Time                 `json:"finishedOn,omitempty"`
+	Status     string                    `json:"status,omitempty"`
+	Steps      []util.StepAttestation    `json:"steps,omitempty"`
+	Invocation slsa.ProvenanceInvocation `json:"invocation,omitempty"`
 }
 
 func GenerateAttestation(builderID string, pr *v1beta1.PipelineRun, logger *zap.SugaredLogger) (interface{}, error) {
@@ -56,34 +56,15 @@ func GenerateAttestation(builderID string, pr *v1beta1.PipelineRun, logger *zap.
 }
 
 func invocation(pr *v1beta1.PipelineRun) slsa.ProvenanceInvocation {
-	i := slsa.ProvenanceInvocation{}
-	params := make(map[string]string)
-	// add params
+	var paramSpecs []v1beta1.ParamSpec
 	if ps := pr.Status.PipelineSpec; ps != nil {
-		for _, p := range ps.Params {
-			if p.Default != nil {
-				v := p.Default.StringVal
-				if v == "" {
-					v = fmt.Sprintf("%v", p.Default.ArrayVal)
-				}
-				params[p.Name] = v
-			}
-		}
+		paramSpecs = ps.Params
 	}
-	// get parameters
-	for _, p := range pr.Spec.Params {
-		v := p.Value.StringVal
-		if v == "" {
-			v = fmt.Sprintf("%v", p.Value.ArrayVal)
-		}
-		params[p.Name] = v
-	}
-	i.Parameters = params
-	return i
+	return util.AttestInvocation(pr.Spec.Params, paramSpecs)
 }
 
 func buildConfig(pr *v1beta1.PipelineRun) BuildConfig {
-	tasks := []Task{}
+	tasks := []TaskAttestation{}
 
 	// pipelineRun.status.taskRuns doesn't maintain order,
 	// so we'll store here and use the order from pipelineRun.status.pipelineSpec.tasks
@@ -113,7 +94,9 @@ func buildConfig(pr *v1beta1.PipelineRun) BuildConfig {
 		if len(after) == 0 && i >= len(pSpec.Tasks) && last != "" {
 			after = append(after, last)
 		}
-		task := Task{
+		params := tr.Params
+		paramSpecs := trStatus.Status.TaskSpec.Params
+		task := TaskAttestation{
 			Name:       trStatus.PipelineTaskName,
 			After:      after,
 			Ref:        *tr.TaskRef,
@@ -121,6 +104,7 @@ func buildConfig(pr *v1beta1.PipelineRun) BuildConfig {
 			FinishedOn: trStatus.Status.CompletionTime.Time,
 			Status:     getStatus(trStatus.Status.Conditions),
 			Steps:      steps,
+			Invocation: util.AttestInvocation(params, paramSpecs),
 		}
 
 		tasks = append(tasks, task)
