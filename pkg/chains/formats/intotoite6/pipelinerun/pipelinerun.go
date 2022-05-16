@@ -22,8 +22,8 @@ type Task struct {
 	Name       string                 `json:"name,omitempty"`
 	After      []string               `json:"after,omitempty"`
 	Ref        v1beta1.TaskRef        `json:"ref,omitempty"`
-	StartedAt  time.Time              `json:"startedAt,omitempty"`
-	FinishedAt time.Time              `json:"finishedAt,omitempty"`
+	StartedOn  time.Time              `json:"startedOn,omitempty"`
+	FinishedOn time.Time              `json:"finishedOn,omitempty"`
 	Status     string                 `json:"status,omitempty"`
 	Steps      []util.StepAttestation `json:"steps,omitempty"`
 }
@@ -117,8 +117,8 @@ func buildConfig(pr *v1beta1.PipelineRun) BuildConfig {
 			Name:       trStatus.PipelineTaskName,
 			After:      after,
 			Ref:        *tr.TaskRef,
-			StartedAt:  trStatus.Status.StartTime.Time,
-			FinishedAt: trStatus.Status.CompletionTime.Time,
+			StartedOn:  trStatus.Status.StartTime.Time,
+			FinishedOn: trStatus.Status.CompletionTime.Time,
 			Status:     getStatus(trStatus.Status.Conditions),
 			Steps:      steps,
 		}
