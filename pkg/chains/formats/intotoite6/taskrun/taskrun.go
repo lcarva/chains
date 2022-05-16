@@ -1,8 +1,6 @@
 package taskrun
 
 import (
-	"fmt"
-
 	intoto "github.com/in-toto/in-toto-golang/in_toto"
 	slsa "github.com/in-toto/in-toto-golang/in_toto/slsa_provenance/v0.2"
 	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/util"
@@ -40,26 +38,11 @@ func GenerateAttestation(builderID string, tr *v1beta1.TaskRun, logger *zap.Suga
 // we currently don't set ConfigSource because we don't know
 // which material the Task definition came from
 func invocation(tr *v1beta1.TaskRun) slsa.ProvenanceInvocation {
-	i := slsa.ProvenanceInvocation{}
-	// get parameters
-	params := make(map[string]string)
-	for _, p := range tr.Spec.Params {
-		params[p.Name] = fmt.Sprintf("%v", p.Value)
-	}
-	// add params
+	var paramSpecs []v1beta1.ParamSpec
 	if ts := tr.Status.TaskSpec; ts != nil {
-		for _, p := range ts.Params {
-			if p.Default != nil {
-				v := p.Default.StringVal
-				if v == "" {
-					v = fmt.Sprintf("%v", p.Default.ArrayVal)
-				}
-				params[p.Name] = v
-			}
-		}
+		paramSpecs = ts.Params
 	}
-	i.Parameters = params
-	return i
+	return util.AttestInvocation(tr.Spec.Params, paramSpecs)
 }
 
 func metadata(tr *v1beta1.TaskRun) *slsa.ProvenanceMetadata {
