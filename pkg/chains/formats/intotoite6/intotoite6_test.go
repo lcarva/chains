@@ -24,6 +24,7 @@ import (
 
 	"github.com/tektoncd/chains/pkg/chains/formats"
 	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/taskrun"
+	"github.com/tektoncd/chains/pkg/chains/formats/intotoite6/util"
 	"github.com/tektoncd/chains/pkg/config"
 
 	"github.com/google/go-cmp/cmp"
@@ -78,7 +79,7 @@ func TestCreatePayload1(t *testing.T) {
 			},
 			BuildType: "https://tekton.dev/attestations/chains@v2",
 			BuildConfig: taskrun.BuildConfig{
-				Steps: []taskrun.Step{
+				Steps: []util.StepAttestation{
 					{
 						Arguments: []string(nil),
 						Environment: map[string]interface{}{
@@ -139,7 +140,7 @@ func TestCreatePayload2(t *testing.T) {
 			},
 			BuildType: "https://tekton.dev/attestations/chains@v2",
 			BuildConfig: taskrun.BuildConfig{
-				Steps: []taskrun.Step{
+				Steps: []util.StepAttestation{
 					{
 						Arguments: []string(nil),
 						Environment: map[string]interface{}{
@@ -218,7 +219,7 @@ func TestMultipleSubjects(t *testing.T) {
 				Parameters: map[string]string{},
 			},
 			BuildConfig: taskrun.BuildConfig{
-				Steps: []taskrun.Step{
+				Steps: []util.StepAttestation{
 					{
 						Arguments: []string(nil),
 						Environment: map[string]interface{}{

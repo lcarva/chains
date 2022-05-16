@@ -93,3 +93,28 @@ func SpdxGit(url, revision string) string {
 	}
 	return prefix + url + fmt.Sprintf("@%s", revision)
 }
+
+type StepAttestation struct {
+	EntryPoint  string            `json:"entryPoint"`
+	Arguments   interface{}       `json:"arguments,omitempty"`
+	Environment interface{}       `json:"environment,omitempty"`
+	Annotations map[string]string `json:"annotations"`
+}
+
+func AttestStep(step *v1beta1.Step, stepState *v1beta1.StepState) StepAttestation {
+	attestation := StepAttestation{}
+
+	entrypoint := strings.Join(step.Command, " ")
+	if step.Script != "" {
+		entrypoint = step.Script
+	}
+	attestation.EntryPoint = entrypoint
+	attestation.Arguments = step.Args
+
+	env := map[string]interface{}{}
+	env["image"] = stepState.ImageID
+	env["container"] = stepState.Name
+	attestation.Environment = env
+
+	return attestation
+}
