@@ -18,6 +18,7 @@ import (
 
 const (
 	TektonID                     = "https://tekton.dev/attestations/chains@v2"
+	TektonPipelineRunID          = "https://tekton.dev/attestations/chains/pipelinerun@v2"
 	CommitParam                  = "CHAINS-GIT_COMMIT"
 	UrlParam                     = "CHAINS-GIT_URL"
 	ChainsReproducibleAnnotation = "chains.tekton.dev/reproducible"
