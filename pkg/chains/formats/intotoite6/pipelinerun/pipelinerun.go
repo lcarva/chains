@@ -20,6 +20,8 @@ type BuildConfig struct {
 
 type Task struct {
 	Name       string                 `json:"name,omitempty"`
+	After      []string               `json:"after,omitempty"`
+	Ref        v1beta1.TaskRef        `json:"ref,omitempty"`
 	StartedAt  time.Time              `json:"startedAt,omitempty"`
 	FinishedAt time.Time              `json:"finishedAt,omitempty"`
 	Status     string                 `json:"status,omitempty"`
@@ -43,7 +45,7 @@ func GenerateAttestation(builderID string, pr *v1beta1.PipelineRun, logger *zap.
 			Builder: slsa.ProvenanceBuilder{
 				ID: builderID,
 			},
-			BuildType:   util.TektonID,
+			BuildType:   util.TektonPipelineRunID,
 			Invocation:  invocation(pr),
 			BuildConfig: buildConfig(pr),
 			Metadata:    metadata(pr),
@@ -91,11 +93,10 @@ func buildConfig(pr *v1beta1.PipelineRun) BuildConfig {
 	}
 
 	pSpec := pr.Status.PipelineSpec
-	pipelineTasks := make([]v1beta1.PipelineTask, 0, len(pSpec.Tasks)+len(pSpec.Finally))
-	pipelineTasks = append(pipelineTasks, pSpec.Tasks...)
-	pipelineTasks = append(pipelineTasks, pSpec.Finally...)
+	pipelineTasks := append(pSpec.Tasks, pSpec.Finally...)
 
-	for _, tr := range pipelineTasks {
+	var last string
+	for i, tr := range pipelineTasks {
 		trStatus := trStatuses[tr.Name]
 		if trStatus == nil {
 			// Ignore Tasks that did not execute during the PipelineRun.
@@ -106,14 +107,26 @@ func buildConfig(pr *v1beta1.PipelineRun) BuildConfig {
 			stepState := trStatus.Status.TaskSpec.Steps[i]
 			steps = append(steps, util.AttestStep(&stepState, &step))
 		}
+		after := tr.RunAfter
+		// tr is a finally task without an explicit runAfter value. It must have executed
+		// after the last non-finally task, if any non-finally tasks were executed.
+		if len(after) == 0 && i >= len(pSpec.Tasks) && last != "" {
+			after = append(after, last)
+		}
 		task := Task{
 			Name:       trStatus.PipelineTaskName,
+			After:      after,
+			Ref:        *tr.TaskRef,
 			StartedAt:  trStatus.Status.StartTime.Time,
 			FinishedAt: trStatus.Status.CompletionTime.Time,
 			Status:     getStatus(trStatus.Status.Conditions),
 			Steps:      steps,
 		}
+
 		tasks = append(tasks, task)
+		if i < len(pSpec.Tasks) {
+			last = task.Name
+		}
 	}
 	return BuildConfig{Tasks: tasks}
 }
