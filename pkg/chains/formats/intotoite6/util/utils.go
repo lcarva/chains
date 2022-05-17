@@ -120,36 +120,30 @@ func AttestStep(step *v1beta1.Step, stepState *v1beta1.StepState) StepAttestatio
 	return attestation
 }
 
-func AttestInvocation(params []v1beta1.Param, paramSpecs []v1beta1.ParamSpec) slsa.ProvenanceInvocation {
+func AttestInvocation(params []v1beta1.Param, paramSpecs []v1beta1.ParamSpec, logger *zap.SugaredLogger) slsa.ProvenanceInvocation {
 	i := slsa.ProvenanceInvocation{}
 	iParams := make(map[string]string)
 
 	// get implicit parameters from defaults
 	for _, p := range paramSpecs {
 		if p.Default != nil {
-			// TODO: Consider using p.Default.MarshalJSON()
-			var v string
-			switch p.Default.Type {
-			case v1beta1.ParamTypeString:
-				v = p.Default.StringVal
-			case v1beta1.ParamTypeArray:
-				v = fmt.Sprintf("%v", p.Default.ArrayVal)
+			v, err := p.Default.MarshalJSON()
+			if err != nil {
+				logger.Errorf("Unable to marshall %q default parameter: %s", p, err)
+				continue
 			}
-			iParams[p.Name] = v
+			iParams[p.Name] = string(v)
 		}
 	}
 
 	// get explicit parameters
 	for _, p := range params {
-		// TODO: Consider using p.Value.MarshalJSON()
-		var v string
-		switch p.Value.Type {
-		case v1beta1.ParamTypeString:
-			v = p.Value.StringVal
-		case v1beta1.ParamTypeArray:
-			v = fmt.Sprintf("%v", p.Value.ArrayVal)
+		v, err := p.Value.MarshalJSON()
+		if err != nil {
+			logger.Errorf("Unable to marshall %q parameter: %s", p, err)
+			continue
 		}
-		iParams[p.Name] = v
+		iParams[p.Name] = string(v)
 	}
 
 	i.Parameters = iParams
