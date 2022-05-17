@@ -46,8 +46,8 @@ func GenerateAttestation(builderID string, pr *v1beta1.PipelineRun, logger *zap.
 				ID: builderID,
 			},
 			BuildType:   util.TektonPipelineRunID,
-			Invocation:  invocation(pr),
-			BuildConfig: buildConfig(pr),
+			Invocation:  invocation(pr, logger),
+			BuildConfig: buildConfig(pr, logger),
 			Metadata:    metadata(pr),
 			Materials:   materials(pr),
 		},
@@ -55,15 +55,15 @@ func GenerateAttestation(builderID string, pr *v1beta1.PipelineRun, logger *zap.
 	return att, nil
 }
 
-func invocation(pr *v1beta1.PipelineRun) slsa.ProvenanceInvocation {
+func invocation(pr *v1beta1.PipelineRun, logger *zap.SugaredLogger) slsa.ProvenanceInvocation {
 	var paramSpecs []v1beta1.ParamSpec
 	if ps := pr.Status.PipelineSpec; ps != nil {
 		paramSpecs = ps.Params
 	}
-	return util.AttestInvocation(pr.Spec.Params, paramSpecs)
+	return util.AttestInvocation(pr.Spec.Params, paramSpecs, logger)
 }
 
-func buildConfig(pr *v1beta1.PipelineRun) BuildConfig {
+func buildConfig(pr *v1beta1.PipelineRun, logger *zap.SugaredLogger) BuildConfig {
 	tasks := []TaskAttestation{}
 
 	// pipelineRun.status.taskRuns doesn't maintain order,
@@ -104,7 +104,7 @@ func buildConfig(pr *v1beta1.PipelineRun) BuildConfig {
 			FinishedOn: trStatus.Status.CompletionTime.Time,
 			Status:     getStatus(trStatus.Status.Conditions),
 			Steps:      steps,
-			Invocation: util.AttestInvocation(params, paramSpecs),
+			Invocation: util.AttestInvocation(params, paramSpecs, logger),
 		}
 
 		tasks = append(tasks, task)

@@ -25,7 +25,7 @@ func GenerateAttestation(builderID string, tr *v1beta1.TaskRun, logger *zap.Suga
 				ID: builderID,
 			},
 			BuildType:   util.TektonID,
-			Invocation:  invocation(tr),
+			Invocation:  invocation(tr, logger),
 			BuildConfig: buildConfig(tr),
 			Metadata:    metadata(tr),
 			Materials:   materials(tr),
@@ -37,12 +37,12 @@ func GenerateAttestation(builderID string, tr *v1beta1.TaskRun, logger *zap.Suga
 // invocation describes the event that kicked off the build
 // we currently don't set ConfigSource because we don't know
 // which material the Task definition came from
-func invocation(tr *v1beta1.TaskRun) slsa.ProvenanceInvocation {
+func invocation(tr *v1beta1.TaskRun, logger *zap.SugaredLogger) slsa.ProvenanceInvocation {
 	var paramSpecs []v1beta1.ParamSpec
 	if ts := tr.Status.TaskSpec; ts != nil {
 		paramSpecs = ts.Params
 	}
-	return util.AttestInvocation(tr.Spec.Params, paramSpecs)
+	return util.AttestInvocation(tr.Spec.Params, paramSpecs, logger)
 }
 
 func metadata(tr *v1beta1.TaskRun) *slsa.ProvenanceMetadata {
