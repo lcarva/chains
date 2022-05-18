@@ -26,6 +26,7 @@ type TaskAttestation struct {
 	Status     string                    `json:"status,omitempty"`
 	Steps      []util.StepAttestation    `json:"steps,omitempty"`
 	Invocation slsa.ProvenanceInvocation `json:"invocation,omitempty"`
+	Results    []v1beta1.TaskRunResult   `json:"results,omitempty"`
 }
 
 func GenerateAttestation(builderID string, pr *v1beta1.PipelineRun, logger *zap.SugaredLogger) (interface{}, error) {
@@ -105,6 +106,7 @@ func buildConfig(pr *v1beta1.PipelineRun, logger *zap.SugaredLogger) BuildConfig
 			Status:     getStatus(trStatus.Status.Conditions),
 			Steps:      steps,
 			Invocation: util.AttestInvocation(params, paramSpecs, logger),
+			Results:    trStatus.Status.TaskRunResults,
 		}
 
 		tasks = append(tasks, task)
