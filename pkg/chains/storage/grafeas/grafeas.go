@@ -92,7 +92,7 @@ func NewStorageBackend(ctx context.Context, logger *zap.SugaredLogger, cfg confi
 }
 
 // StorePayload implements the storage.Backend interface.
-func (b *Backend) StorePayload(ctx context.Context, _ versioned.Interface, obj objects.K8sObject, rawPayload []byte, signature string, opts config.StorageOpts) error {
+func (b *Backend) StorePayload(ctx context.Context, _ versioned.Interface, obj objects.TektonObject, rawPayload []byte, signature string, opts config.StorageOpts) error {
 	// TODO: Gracefully handle unexpected type
 	tr := obj.GetObject().(*v1beta1.TaskRun)
 	// We only support simplesigning for OCI images, and in-toto for taskrun.
@@ -135,7 +135,7 @@ func (b *Backend) StorePayload(ctx context.Context, _ versioned.Interface, obj o
 }
 
 // Retrieve payloads from grafeas server and store it in a map
-func (b *Backend) RetrievePayloads(ctx context.Context, _ versioned.Interface, obj objects.K8sObject, opts config.StorageOpts) (map[string]string, error) {
+func (b *Backend) RetrievePayloads(ctx context.Context, _ versioned.Interface, obj objects.TektonObject, opts config.StorageOpts) (map[string]string, error) {
 	// TODO: Gracefully handle unexpected type
 	tr := obj.GetObject().(*v1beta1.TaskRun)
 	// initialize an empty map for result
@@ -160,7 +160,7 @@ func (b *Backend) RetrievePayloads(ctx context.Context, _ versioned.Interface, o
 }
 
 // Retrieve signatures from grafeas server and store it in a map
-func (b *Backend) RetrieveSignatures(ctx context.Context, _ versioned.Interface, obj objects.K8sObject, opts config.StorageOpts) (map[string][]string, error) {
+func (b *Backend) RetrieveSignatures(ctx context.Context, _ versioned.Interface, obj objects.TektonObject, opts config.StorageOpts) (map[string][]string, error) {
 	// TODO: Gracefully handle unexpected type
 	tr := obj.GetObject().(*v1beta1.TaskRun)
 	// initialize an empty map for result

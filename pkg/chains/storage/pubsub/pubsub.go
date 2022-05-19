@@ -54,7 +54,7 @@ func (b *Backend) Type() string {
 	return StorageBackendPubSub
 }
 
-func (b *Backend) StorePayload(ctx context.Context, _ versioned.Interface, obj objects.K8sObject, rawPayload []byte, signature string, opts config.StorageOpts) error {
+func (b *Backend) StorePayload(ctx context.Context, _ versioned.Interface, obj objects.TektonObject, rawPayload []byte, signature string, opts config.StorageOpts) error {
 	// TODO: Handle unsupported type gracefully
 	tr := obj.GetObject().(*v1beta1.TaskRun)
 	b.logger.Infof("Storing payload on TaskRun %s/%s", tr.Namespace, tr.Name)
@@ -85,11 +85,11 @@ func (b *Backend) StorePayload(ctx context.Context, _ versioned.Interface, obj o
 	return nil
 }
 
-func (b *Backend) RetrievePayloads(ctx context.Context, _ versioned.Interface, _ objects.K8sObject, opts config.StorageOpts) (map[string]string, error) {
+func (b *Backend) RetrievePayloads(ctx context.Context, _ versioned.Interface, _ objects.TektonObject, opts config.StorageOpts) (map[string]string, error) {
 	return nil, fmt.Errorf("not implemented for this storage backend: %s", b.Type())
 }
 
-func (b *Backend) RetrieveSignatures(ctx context.Context, _ versioned.Interface, _ objects.K8sObject, opts config.StorageOpts) (map[string][]string, error) {
+func (b *Backend) RetrieveSignatures(ctx context.Context, _ versioned.Interface, _ objects.TektonObject, opts config.StorageOpts) (map[string][]string, error) {
 	return nil, fmt.Errorf("not implemented for this storage backend: %s", b.Type())
 }
 

@@ -50,7 +50,7 @@ type Backend struct {
 	logger           *zap.SugaredLogger
 	cfg              config.Config
 	client           kubernetes.Interface
-	getAuthenticator func(ctx context.Context, obj objects.K8sObject, client kubernetes.Interface) (remote.Option, error)
+	getAuthenticator func(ctx context.Context, obj objects.TektonObject, client kubernetes.Interface) (remote.Option, error)
 }
 
 // NewStorageBackend returns a new OCI StorageBackend that stores signatures in an OCI registry
@@ -59,7 +59,7 @@ func NewStorageBackend(ctx context.Context, logger *zap.SugaredLogger, client ku
 		logger: logger,
 		cfg:    cfg,
 		client: client,
-		getAuthenticator: func(ctx context.Context, obj objects.K8sObject, client kubernetes.Interface) (remote.Option, error) {
+		getAuthenticator: func(ctx context.Context, obj objects.TektonObject, client kubernetes.Interface) (remote.Option, error) {
 			kc, err := k8schain.New(ctx, client,
 				k8schain.Options{Namespace: obj.GetNamespace(), ServiceAccountName: obj.GetServiceAccountName()})
 			if err != nil {
@@ -71,7 +71,7 @@ func NewStorageBackend(ctx context.Context, logger *zap.SugaredLogger, client ku
 }
 
 // StorePayload implements the storage.Backend interface.
-func (b *Backend) StorePayload(ctx context.Context, _ versioned.Interface, obj objects.K8sObject, rawPayload []byte, signature string, storageOpts config.StorageOpts) error {
+func (b *Backend) StorePayload(ctx context.Context, _ versioned.Interface, obj objects.TektonObject, rawPayload []byte, signature string, storageOpts config.StorageOpts) error {
 	// TODO: Handle unexpected type gracefully
 	auth, err := b.getAuthenticator(ctx, obj, b.client)
 	if err != nil {
@@ -99,8 +99,7 @@ func (b *Backend) StorePayload(ctx context.Context, _ versioned.Interface, obj o
 		// that is not intended to produce an image, e.g. git-clone.
 		if len(attestation.Subject) == 0 {
 			b.logger.Infof(
-				"No image subject to attest for %s/%s/%s. Skipping upload to registry",
-				obj.GetKind(), obj.GetNamespace(), obj.GetName())
+				"No image subject to attest for %s/%s/%s. Skipping upload to registry", obj.GetKind(), obj.GetNamespace(), obj.GetName())
 			return nil
 		}
 
@@ -207,7 +206,7 @@ func (b *Backend) Type() string {
 	return StorageBackendOCI
 }
 
-func (b *Backend) RetrieveSignatures(ctx context.Context, _ versioned.Interface, obj objects.K8sObject, opts config.StorageOpts) (map[string][]string, error) {
+func (b *Backend) RetrieveSignatures(ctx context.Context, _ versioned.Interface, obj objects.TektonObject, opts config.StorageOpts) (map[string][]string, error) {
 	images, err := b.RetrieveArtifact(ctx, obj, opts)
 	if err != nil {
 		return nil, err
@@ -235,7 +234,7 @@ func (b *Backend) RetrieveSignatures(ctx context.Context, _ versioned.Interface,
 	return m, nil
 }
 
-func (b *Backend) RetrievePayloads(ctx context.Context, _ versioned.Interface, obj objects.K8sObject, opts config.StorageOpts) (map[string]string, error) {
+func (b *Backend) RetrievePayloads(ctx context.Context, _ versioned.Interface, obj objects.TektonObject, opts config.StorageOpts) (map[string]string, error) {
 	var err error
 	images, err := b.RetrieveArtifact(ctx, obj, opts)
 	if err != nil {
@@ -279,7 +278,7 @@ func (b *Backend) RetrievePayloads(ctx context.Context, _ versioned.Interface, o
 	return m, nil
 }
 
-func (b *Backend) RetrieveArtifact(ctx context.Context, obj objects.K8sObject, opts config.StorageOpts) (map[string]oci.SignedImage, error) {
+func (b *Backend) RetrieveArtifact(ctx context.Context, obj objects.TektonObject, opts config.StorageOpts) (map[string]oci.SignedImage, error) {
 	// Given the TaskRun, retrieve the OCI images.
 	images := artifacts.ExtractOCIImagesFromResults(obj, b.logger)
 	m := make(map[string]oci.SignedImage)

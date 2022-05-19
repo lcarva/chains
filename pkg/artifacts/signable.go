@@ -27,7 +27,7 @@ import (
 )
 
 type Signable interface {
-	ExtractObjects(obj objects.K8sObject) []interface{}
+	ExtractObjects(obj objects.TektonObject) []interface{}
 	StorageBackend(cfg config.Config) sets.String
 	Signer(cfg config.Config) string
 	PayloadFormat(cfg config.Config) formats.PayloadType
@@ -45,7 +45,7 @@ func (ta *TaskRunArtifact) Key(obj interface{}) string {
 	return "taskrun-" + string(tr.UID)
 }
 
-func (ta *TaskRunArtifact) ExtractObjects(obj objects.K8sObject) []interface{} {
+func (ta *TaskRunArtifact) ExtractObjects(obj objects.TektonObject) []interface{} {
 	tr := obj.GetObject().(*v1beta1.TaskRun)
 	return []interface{}{tr}
 }
@@ -79,7 +79,7 @@ func (pa *PipelineRunArtifact) Key(obj interface{}) string {
 	return "pipelinerun-" + string(pr.UID)
 }
 
-func (pa *PipelineRunArtifact) ExtractObjects(obj objects.K8sObject) []interface{} {
+func (pa *PipelineRunArtifact) ExtractObjects(obj objects.TektonObject) []interface{} {
 	pr := obj.GetObject().(*v1beta1.PipelineRun)
 	return []interface{}{pr}
 }
@@ -114,7 +114,7 @@ type image struct {
 	digest string
 }
 
-func (oa *OCIArtifact) ExtractObjects(obj objects.K8sObject) []interface{} {
+func (oa *OCIArtifact) ExtractObjects(obj objects.TektonObject) []interface{} {
 	objs := []interface{}{}
 
 	// TODO: Not applicable to PipelineRuns, should look into a better way to separate this out
@@ -158,7 +158,7 @@ func (oa *OCIArtifact) ExtractObjects(obj objects.K8sObject) []interface{} {
 	return objs
 }
 
-func ExtractOCIImagesFromResults(obj objects.K8sObject, logger *zap.SugaredLogger) []interface{} {
+func ExtractOCIImagesFromResults(obj objects.TektonObject, logger *zap.SugaredLogger) []interface{} {
 	taskResultImages := map[string]*image{}
 	var objs []interface{}
 	urlSuffix := "IMAGE_URL"

@@ -182,7 +182,7 @@ func TestTaskRunSigner_Sign(t *testing.T) {
 			ctx = config.ToContext(ctx, cfg.DeepCopy())
 
 			logger := logging.FromContext(ctx)
-			ts := &TaskRunSigner{
+			ts := &ObjectSigner{
 				Formatters:        AllFormatters(*cfg, logger),
 				Backends:          fakeAllBackends(tt.backends),
 				SecretPath:        "./signing/x509/testdata/",
@@ -194,10 +194,11 @@ func TestTaskRunSigner_Sign(t *testing.T) {
 					Name: "foo",
 				},
 			}
+			tro := objects.NewTaskRunObject(tr)
 			if _, err := ps.TektonV1beta1().TaskRuns(tr.Namespace).Create(ctx, tr, metav1.CreateOptions{}); err != nil {
 				t.Errorf("error creating fake taskrun: %v", err)
 			}
-			if err := ts.Sign(ctx, tr); (err != nil) != tt.wantErr {
+			if err := ts.Sign(ctx, tro); (err != nil) != tt.wantErr {
 				t.Errorf("TaskRunSigner.Sign() error = %v", err)
 			}
 
@@ -207,9 +208,10 @@ func TestTaskRunSigner_Sign(t *testing.T) {
 				t.Errorf("error fetching fake taskrun: %v", err)
 			}
 			// Check it is marked as signed
+			tro = objects.NewTaskRunObject(tr)
 			shouldBeSigned := !tt.wantErr
-			if Reconciled(tr) != shouldBeSigned {
-				t.Errorf("IsSigned()=%t, wanted %t", Reconciled(tr), shouldBeSigned)
+			if Reconciled(tro) != shouldBeSigned {
+				t.Errorf("IsSigned()=%t, wanted %t", Reconciled(tro), shouldBeSigned)
 			}
 			// Check the payloads were stored in all the backends.
 			for _, b := range tt.backends {
@@ -255,7 +257,7 @@ func TestTaskRunSigner_Transparency(t *testing.T) {
 		ctx = config.ToContext(ctx, cfg.DeepCopy())
 
 		logger := logging.FromContext(ctx)
-		ts := &TaskRunSigner{
+		ts := &ObjectSigner{
 			Formatters:        AllFormatters(*cfg, logger),
 			Backends:          fakeAllBackends(backends),
 			SecretPath:        "./signing/x509/testdata/",
@@ -267,10 +269,11 @@ func TestTaskRunSigner_Transparency(t *testing.T) {
 				Name: "foo",
 			},
 		}
+		tro := objects.NewTaskRunObject(tr)
 		if _, err := ps.TektonV1beta1().TaskRuns(tr.Namespace).Create(ctx, tr, metav1.CreateOptions{}); err != nil {
 			t.Errorf("error creating fake taskrun: %v", err)
 		}
-		if err := ts.Sign(ctx, tr); err != nil {
+		if err := ts.Sign(ctx, tro); err != nil {
 			t.Errorf("TaskRunSigner.Sign() error = %v", err)
 		}
 
@@ -282,15 +285,15 @@ func TestTaskRunSigner_Transparency(t *testing.T) {
 		cfg.Transparency.Enabled = true
 		ctx = config.ToContext(ctx, cfg.DeepCopy())
 
-		tr2 := &v1beta1.TaskRun{
+		tr = &v1beta1.TaskRun{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "foobar",
 			},
 		}
-		if _, err := ps.TektonV1beta1().TaskRuns(tr.Namespace).Create(ctx, tr2, metav1.CreateOptions{}); err != nil {
+		if _, err := ps.TektonV1beta1().TaskRuns(tr.Namespace).Create(ctx, tr, metav1.CreateOptions{}); err != nil {
 			t.Errorf("error creating fake taskrun: %v", err)
 		}
-		if err := ts.Sign(ctx, tr2); err != nil {
+		if err := ts.Sign(ctx, objects.NewTaskRunObject(tr)); err != nil {
 			t.Errorf("TaskRunSigner.Sign() error = %v", err)
 		}
 
@@ -302,16 +305,17 @@ func TestTaskRunSigner_Transparency(t *testing.T) {
 		cfg.Transparency.VerifyAnnotation = true
 		ctx = config.ToContext(ctx, cfg.DeepCopy())
 
-		tr3 := &v1beta1.TaskRun{
+		tr = &v1beta1.TaskRun{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "mytaskrun",
 			},
 		}
+		tro = objects.NewTaskRunObject(tr)
 
-		if _, err := ps.TektonV1beta1().TaskRuns(tr.Namespace).Create(ctx, tr3, metav1.CreateOptions{}); err != nil {
+		if _, err := ps.TektonV1beta1().TaskRuns(tr.Namespace).Create(ctx, tr, metav1.CreateOptions{}); err != nil {
 			t.Errorf("error creating fake taskrun: %v", err)
 		}
-		if err := ts.Sign(ctx, tr3); err != nil {
+		if err := ts.Sign(ctx, tro); err != nil {
 			t.Errorf("TaskRunSigner.Sign() error = %v", err)
 		}
 
@@ -319,8 +323,8 @@ func TestTaskRunSigner_Transparency(t *testing.T) {
 			t.Error("expected new transparency log entries!")
 		}
 		// add in the annotation
-		tr3.Annotations = map[string]string{RekorAnnotation: "true"}
-		if err := ts.Sign(ctx, tr3); err != nil {
+		tr.Annotations = map[string]string{RekorAnnotation: "true"}
+		if err := ts.Sign(ctx, tro); err != nil {
 			t.Errorf("TaskRunSigner.Sign() error = %v", err)
 		}
 
@@ -367,7 +371,7 @@ type mockBackend struct {
 }
 
 // StorePayload implements the Payloader interface.
-func (b *mockBackend) StorePayload(ctx context.Context, _ versioned.Interface, _ objects.K8sObject, rawPayload []byte, signature string, opts config.StorageOpts) error {
+func (b *mockBackend) StorePayload(ctx context.Context, _ versioned.Interface, _ objects.TektonObject, rawPayload []byte, signature string, opts config.StorageOpts) error {
 	if b.shouldErr {
 		return errors.New("mock error storing")
 	}
@@ -379,10 +383,10 @@ func (b *mockBackend) Type() string {
 	return b.backendType
 }
 
-func (b *mockBackend) RetrievePayloads(ctx context.Context, _ versioned.Interface, _ objects.K8sObject, opts config.StorageOpts) (map[string]string, error) {
+func (b *mockBackend) RetrievePayloads(ctx context.Context, _ versioned.Interface, _ objects.TektonObject, opts config.StorageOpts) (map[string]string, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (b *mockBackend) RetrieveSignatures(ctx context.Context, _ versioned.Interface, _ objects.K8sObject, opts config.StorageOpts) (map[string][]string, error) {
+func (b *mockBackend) RetrieveSignatures(ctx context.Context, _ versioned.Interface, _ objects.TektonObject, opts config.StorageOpts) (map[string][]string, error) {
 	return nil, fmt.Errorf("not implemented")
 }

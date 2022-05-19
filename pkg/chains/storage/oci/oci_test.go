@@ -161,7 +161,7 @@ func TestBackend_StorePayload(t *testing.T) {
 			trObj := objects.NewTaskRunObject(tt.fields.tr)
 			b := &Backend{
 				logger: logtesting.TestLogger(t),
-				getAuthenticator: func(_ context.Context, _ objects.K8sObject, _ kubernetes.Interface) (remote.Option, error) {
+				getAuthenticator: func(_ context.Context, _ objects.TektonObject, _ kubernetes.Interface) (remote.Option, error) {
 					return remote.WithAuthFromKeychain(authn.DefaultKeychain), nil
 				},
 			}

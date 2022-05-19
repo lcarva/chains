@@ -53,8 +53,8 @@ func NewStorageBackend(ps versioned.Interface, logger *zap.SugaredLogger) *Backe
 }
 
 // StorePayload implements the Payloader interface.
-func (b *Backend) StorePayload(ctx context.Context, clientSet versioned.Interface, obj objects.K8sObject, rawPayload []byte, signature string, opts config.StorageOpts) error {
-	b.logger.Infof("Storing payload on %s/%s/%s", obj.GetNamespace(), obj.GetKind(), obj.GetName())
+func (b *Backend) StorePayload(ctx context.Context, clientSet versioned.Interface, obj objects.TektonObject, rawPayload []byte, signature string, opts config.StorageOpts) error {
+	b.logger.Infof("Storing payload on %s/%s/%s", obj.GetKind(), obj.GetNamespace(), obj.GetName())
 
 	// Use patch instead of update to prevent race conditions.
 	patchBytes, err := patch.GetAnnotationsPatch(map[string]string{
@@ -81,24 +81,28 @@ func (b *Backend) Type() string {
 }
 
 // retrieveAnnotationValue retrieve the value of an annotation and base64 decode it if needed.
-func (b *Backend) retrieveAnnotationValue(ctx context.Context, clientSet versioned.Interface, obj objects.K8sObject, annotationKey string, decode bool) (string, error) {
+func (b *Backend) retrieveAnnotationValue(ctx context.Context, clientSet versioned.Interface, obj objects.TektonObject, annotationKey string, decode bool) (string, error) {
 	// Retrieve the TaskRun.
-	b.logger.Infof("Retrieving annotation %q on %s/%s/%s", annotationKey, obj.GetNamespace(), obj.GetKind(), obj.GetName())
+	b.logger.Infof("Retrieving annotation %q on %s/%s/%s", annotationKey, obj.GetKind(), obj.GetNamespace(), obj.GetName())
 
 	var annotationValue string
-	ann := obj.GetLatestAnnotation(ctx, clientSet, annotationKey)
+	annotations, err := obj.GetLatestAnnotations(ctx, clientSet)
+	if err != nil {
+		return "", fmt.Errorf("error retrieving the annotation value for the key %q: %s", annotationKey, err)
+	}
+	val, ok := annotations[annotationKey]
 
 	// Ensure it exists.
-	if ann.Ok {
+	if ok {
 		// Decode it if needed.
 		if decode {
-			decodedAnnotation, err := base64.StdEncoding.DecodeString(ann.Value)
+			decodedAnnotation, err := base64.StdEncoding.DecodeString(val)
 			if err != nil {
 				return "", fmt.Errorf("error decoding the annotation value for the key %q: %s", annotationKey, err)
 			}
 			annotationValue = string(decodedAnnotation)
 		} else {
-			annotationValue = ann.Value
+			annotationValue = val
 		}
 	}
 
@@ -106,8 +110,8 @@ func (b *Backend) retrieveAnnotationValue(ctx context.Context, clientSet version
 }
 
 // RetrieveSignature retrieve the signature stored in the taskrun.
-func (b *Backend) RetrieveSignatures(ctx context.Context, clientSet versioned.Interface, obj objects.K8sObject, opts config.StorageOpts) (map[string][]string, error) {
-	b.logger.Infof("Retrieving signature on %s/%s/%s", obj.GetNamespace(), obj.GetKind(), obj.GetName())
+func (b *Backend) RetrieveSignatures(ctx context.Context, clientSet versioned.Interface, obj objects.TektonObject, opts config.StorageOpts) (map[string][]string, error) {
+	b.logger.Infof("Retrieving signature on %s/%s/%s", obj.GetKind(), obj.GetNamespace(), obj.GetName())
 	signatureAnnotation := sigName(opts)
 	signature, err := b.retrieveAnnotationValue(ctx, clientSet, obj, signatureAnnotation, true)
 	if err != nil {
@@ -115,21 +119,19 @@ func (b *Backend) RetrieveSignatures(ctx context.Context, clientSet versioned.In
 	}
 
 	// Check if we have a pipelinerun object, if so just return the signature
-	_, ok := obj.GetObject().(*v1beta1.PipelineRun)
-	if ok {
+	if _, ok := obj.GetObject().(*v1beta1.PipelineRun); ok {
 		return map[string][]string{
 			signatureAnnotation: {signature},
 		}, nil
 	}
 
 	// We must have a taskrun object, so check for the IMAGE_URL param before adding signature
-	tr, ok := obj.GetObject().(*v1beta1.TaskRun)
-	if !ok {
+	if _, ok := obj.GetObject().(*v1beta1.TaskRun); !ok {
 		return nil, errors.New("unrecognized object type for retrieving signatures")
 	}
 
 	m := make(map[string][]string)
-	for _, res := range tr.Status.TaskRunResults {
+	for _, res := range obj.GetResults() {
 		if strings.HasSuffix(res.Name, "IMAGE_URL") {
 			m[signatureAnnotation] = []string{signature}
 			break
@@ -139,8 +141,8 @@ func (b *Backend) RetrieveSignatures(ctx context.Context, clientSet versioned.In
 }
 
 // RetrievePayload retrieve the payload stored in the taskrun.
-func (b *Backend) RetrievePayloads(ctx context.Context, clientSet versioned.Interface, obj objects.K8sObject, opts config.StorageOpts) (map[string]string, error) {
-	b.logger.Infof("Retrieving payload on %s/%s/%s", obj.GetNamespace(), obj.GetKind(), obj.GetName())
+func (b *Backend) RetrievePayloads(ctx context.Context, clientSet versioned.Interface, obj objects.TektonObject, opts config.StorageOpts) (map[string]string, error) {
+	b.logger.Infof("Retrieving payload on %s/%s/%s", obj.GetKind(), obj.GetNamespace(), obj.GetName())
 	payloadAnnotation := payloadName(opts)
 	payload, err := b.retrieveAnnotationValue(ctx, clientSet, obj, payloadAnnotation, true)
 	if err != nil {
@@ -148,21 +150,19 @@ func (b *Backend) RetrievePayloads(ctx context.Context, clientSet versioned.Inte
 	}
 
 	// Check if we have a pipelinerun object, if so just return the signature
-	_, ok := obj.GetObject().(*v1beta1.PipelineRun)
-	if ok {
+	if _, ok := obj.GetObject().(*v1beta1.PipelineRun); ok {
 		return map[string]string{
 			payloadAnnotation: payload,
 		}, nil
 	}
 
 	// We must have a taskrun object, so check for the IMAGE_URL param before adding signature
-	tr, ok := obj.GetObject().(*v1beta1.TaskRun)
-	if !ok {
+	if _, ok := obj.GetObject().(*v1beta1.TaskRun); !ok {
 		return nil, errors.New("unrecognized object type for retrieving payload")
 	}
 
 	m := make(map[string]string)
-	for _, res := range tr.Status.TaskRunResults {
+	for _, res := range obj.GetResults() {
 		if strings.HasSuffix(res.Name, "IMAGE_URL") {
 			m[payloadAnnotation] = payload
 			break

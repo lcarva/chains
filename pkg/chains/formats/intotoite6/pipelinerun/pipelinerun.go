@@ -32,7 +32,7 @@ func GenerateAttestation(builderID string, pr *v1beta1.PipelineRun, logger *zap.
 	// We don't need to pass in a client/context here, as we only want access to the original object
 	// Need a better way to differentiate between an abstracted original k8s object and getting the latest values
 	// - Possibly pass client and context in each method call instead of adding it to the struct?
-	pro := objects.NewPipelineRunObject(pr, nil, nil)
+	pro := objects.NewPipelineRunObject(pr)
 	subjects := util.GetSubjectDigests(pro, logger)
 
 	att := intoto.ProvenanceStatement{

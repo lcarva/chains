@@ -17,6 +17,7 @@ import (
 	"context"
 
 	signing "github.com/tektoncd/chains/pkg/chains"
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	pipelinerunreconciler "github.com/tektoncd/pipeline/pkg/client/injection/reconciler/pipeline/v1beta1/pipelinerun"
 	"knative.dev/pkg/logging"
@@ -52,13 +53,15 @@ func (r *Reconciler) FinalizeKind(ctx context.Context, pr *v1beta1.PipelineRun) 
 		logging.FromContext(ctx).Infof("pipelinerun %s/%s is still running", pr.Namespace, pr.Name)
 		return nil
 	}
+	pro := objects.NewPipelineRunObject(pr)
+
 	// Check to see if it has already been signed.
-	if signing.ReconciledPipelineRun(pr) {
+	if signing.Reconciled(pro) {
 		logging.FromContext(ctx).Infof("pipelinerun %s/%s has been reconciled", pr.Namespace, pr.Name)
 		return nil
 	}
 
-	if err := r.PipelineRunSigner.Sign(ctx, pr); err != nil {
+	if err := r.PipelineRunSigner.Sign(ctx, pro); err != nil {
 		return err
 	}
 	return nil

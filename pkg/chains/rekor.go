@@ -80,7 +80,7 @@ var getRekor = func(url string, l *zap.SugaredLogger) (rekorClient, error) {
 	}, nil
 }
 
-func shouldUploadTlog(cfg config.Config, obj objects.K8sObject) bool {
+func shouldUploadTlog(cfg config.Config, obj objects.TektonObject) bool {
 	// if transparency isn't enabled, return false
 	if !cfg.Transparency.Enabled {
 		return false
@@ -91,12 +91,11 @@ func shouldUploadTlog(cfg config.Config, obj objects.K8sObject) bool {
 	}
 
 	// Already uploaded, don't do it again
-	ann := obj.GetAnnotation(ChainsTransparencyAnnotation)
-	if ann.Ok {
+	if _, ok := obj.GetAnnotations()[ChainsTransparencyAnnotation]; ok {
 		return false
 	}
 
 	// verify the annotation
-	ann = obj.GetAnnotation(RekorAnnotation)
-	return ann.Value == "true"
+	ann := obj.GetAnnotations()[RekorAnnotation]
+	return ann == "true"
 }

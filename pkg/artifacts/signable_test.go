@@ -38,7 +38,7 @@ func TestOCIArtifact_ExtractObjects(t *testing.T) {
 
 	tests := []struct {
 		name string
-		obj  objects.K8sObject
+		obj  objects.TektonObject
 		want []interface{}
 	}{
 		{

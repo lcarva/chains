@@ -26,7 +26,7 @@ const (
 
 // GetSubjectDigests extracts OCI images from the TaskRun based on standard hinting set up
 // It also goes through looking for any PipelineResources of Image type
-func GetSubjectDigests(obj objects.K8sObject, logger *zap.SugaredLogger) []intoto.Subject {
+func GetSubjectDigests(obj objects.TektonObject, logger *zap.SugaredLogger) []intoto.Subject {
 	var subjects []intoto.Subject
 	imgs := artifacts.ExtractOCIImagesFromResults(obj, logger)
 	for _, i := range imgs {

@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	signing "github.com/tektoncd/chains/pkg/chains"
+	"github.com/tektoncd/chains/pkg/chains/objects"
 	"github.com/tektoncd/chains/pkg/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	informers "github.com/tektoncd/pipeline/pkg/client/informers/externalversions/pipeline/v1beta1"
@@ -170,7 +171,7 @@ type mockSigner struct {
 	pipelineRunSigned bool
 }
 
-func (m *mockSigner) Sign(ctx context.Context, obj interface{}) error {
+func (m *mockSigner) Sign(ctx context.Context, obj objects.TektonObject) error {
 	m.taskRunSigned = true
 	m.pipelineRunSigned = true
 	return nil

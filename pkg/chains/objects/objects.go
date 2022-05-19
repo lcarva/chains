@@ -2,23 +2,21 @@ package objects
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 )
 
-const (
-	pipelineRunKind = "PipelineRun"
-	taskRunKind     = "TaskRun"
-)
-
-type Annotation struct {
-	Err   error
-	Value string
-	Ok    bool
+// Used as a generic Kubernetes object
+// Holds fields common to all objects
+// ref: https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.9.4/pkg/client#Object
+type Object interface {
+	metav1.Object
+	runtime.Object
 }
 
 type Result struct {
@@ -26,82 +24,50 @@ type Result struct {
 	Value string
 }
 
-// Represents a generic K8s object
-// This isn't meant to be a final implementation, just one approach
-// Many of these methods can be abstracted away further
-type K8sObject interface {
-	GetName() string
-	GetNamespace() string
+// Extending the generic Kubernetes object
+// Functions apply to all Tekton objects
+type TektonObject interface {
+	Object
 	GetKind() string
-	GetAnnotation(annotation string) *Annotation
-	GetLatestAnnotation(ctx context.Context, clientSet versioned.Interface, annotation string) *Annotation
 	GetObject() interface{}
+	GetLatestAnnotations(ctx context.Context, clientSet versioned.Interface) (map[string]string, error)
 	Patch(ctx context.Context, clientSet versioned.Interface, patchBytes []byte) error
-	GetResults() []Result          // TODO: Abstract this further to return any field in the status
-	GetServiceAccountName() string // TODO: Abstract this further to return any field in the spec
+	GetResults() []Result
+	GetServiceAccountName() string
 }
 
 type TaskRunObject struct {
-	tr *v1beta1.TaskRun
+	*v1beta1.TaskRun
 }
 
 func NewTaskRunObject(tr *v1beta1.TaskRun) *TaskRunObject {
 	return &TaskRunObject{
-		tr: tr,
+		tr,
 	}
-}
-
-func (tro *TaskRunObject) GetName() string {
-	return tro.tr.Name
-}
-
-func (tro *TaskRunObject) GetNamespace() string {
-	return tro.tr.Namespace
 }
 
 func (tro *TaskRunObject) GetKind() string {
-	return taskRunKind
+	return tro.GetObjectKind().GroupVersionKind().Kind
 }
 
-func (tro *TaskRunObject) GetAnnotation(annotation string) *Annotation {
-	val, ok := tro.tr.Annotations[annotation]
-	return &Annotation{
-		Err:   nil,
-		Value: val,
-		Ok:    ok,
-	}
-}
-
-func (tro *TaskRunObject) GetLatestAnnotation(ctx context.Context, clientSet versioned.Interface, annotation string) *Annotation {
-	tr, err := clientSet.TektonV1beta1().TaskRuns(tro.tr.Namespace).Get(ctx, tro.tr.Name, v1.GetOptions{})
-	if err != nil {
-		return &Annotation{
-			Err:   fmt.Errorf("error retrieving taskrun: %s", err),
-			Value: "",
-			Ok:    false,
-		}
-	}
-	val, ok := tr.Annotations[annotation]
-	return &Annotation{
-		Err:   nil,
-		Value: val,
-		Ok:    ok,
-	}
+func (tro *TaskRunObject) GetLatestAnnotations(ctx context.Context, clientSet versioned.Interface) (map[string]string, error) {
+	tr, err := clientSet.TektonV1beta1().TaskRuns(tro.Namespace).Get(ctx, tro.Name, v1.GetOptions{})
+	return tr.Annotations, err
 }
 
 func (tro *TaskRunObject) GetObject() interface{} {
-	return tro.tr
+	return tro.TaskRun
 }
 
 func (tro *TaskRunObject) Patch(ctx context.Context, clientSet versioned.Interface, patchBytes []byte) error {
-	_, err := clientSet.TektonV1beta1().TaskRuns(tro.tr.Namespace).Patch(
-		ctx, tro.tr.Name, types.MergePatchType, patchBytes, v1.PatchOptions{})
+	_, err := clientSet.TektonV1beta1().TaskRuns(tro.Namespace).Patch(
+		ctx, tro.Name, types.MergePatchType, patchBytes, v1.PatchOptions{})
 	return err
 }
 
 func (tro *TaskRunObject) GetResults() []Result {
 	res := []Result{}
-	for _, key := range tro.tr.Status.TaskRunResults {
+	for _, key := range tro.Status.TaskRunResults {
 		res = append(res, Result{
 			Name:  key.Name,
 			Value: key.Value,
@@ -111,74 +77,41 @@ func (tro *TaskRunObject) GetResults() []Result {
 }
 
 func (tro *TaskRunObject) GetServiceAccountName() string {
-	return tro.tr.Spec.ServiceAccountName
+	return tro.Spec.ServiceAccountName
 }
 
 type PipelineRunObject struct {
-	pr        *v1beta1.PipelineRun
-	clientSet versioned.Interface
-	ctx       context.Context
+	*v1beta1.PipelineRun
 }
 
-func NewPipelineRunObject(pr *v1beta1.PipelineRun, clientSet versioned.Interface, ctx context.Context) *PipelineRunObject {
+func NewPipelineRunObject(pr *v1beta1.PipelineRun) *PipelineRunObject {
 	return &PipelineRunObject{
-		pr:        pr,
-		clientSet: clientSet,
-		ctx:       ctx,
+		pr,
 	}
-}
-
-func (pro *PipelineRunObject) GetName() string {
-	return pro.pr.Name
-}
-
-func (pro *PipelineRunObject) GetNamespace() string {
-	return pro.pr.Namespace
 }
 
 func (pro *PipelineRunObject) GetKind() string {
-	return pipelineRunKind
+	return pro.GetObjectKind().GroupVersionKind().Kind
 }
 
-func (pro *PipelineRunObject) GetAnnotation(annotation string) *Annotation {
-	val, ok := pro.pr.Annotations[annotation]
-	return &Annotation{
-		Err:   nil,
-		Value: val,
-		Ok:    ok,
-	}
-}
-
-func (pro *PipelineRunObject) GetLatestAnnotation(ctx context.Context, clientSet versioned.Interface, annotation string) *Annotation {
-	tr, err := clientSet.TektonV1beta1().PipelineRuns(pro.pr.Namespace).Get(ctx, pro.pr.Name, v1.GetOptions{})
-	if err != nil {
-		return &Annotation{
-			Err:   fmt.Errorf("error retrieving pipelinerun: %s", err),
-			Value: "",
-			Ok:    false,
-		}
-	}
-	val, ok := tr.Annotations[annotation]
-	return &Annotation{
-		Err:   nil,
-		Value: val,
-		Ok:    ok,
-	}
+func (pro *PipelineRunObject) GetLatestAnnotations(ctx context.Context, clientSet versioned.Interface) (map[string]string, error) {
+	pr, err := clientSet.TektonV1beta1().PipelineRuns(pro.Namespace).Get(ctx, pro.Name, v1.GetOptions{})
+	return pr.Annotations, err
 }
 
 func (pro *PipelineRunObject) GetObject() interface{} {
-	return pro.pr
+	return pro.PipelineRun
 }
 
 func (pro *PipelineRunObject) Patch(ctx context.Context, clientSet versioned.Interface, patchBytes []byte) error {
-	_, err := clientSet.TektonV1beta1().PipelineRuns(pro.pr.Namespace).Patch(
-		ctx, pro.pr.Name, types.MergePatchType, patchBytes, v1.PatchOptions{})
+	_, err := clientSet.TektonV1beta1().PipelineRuns(pro.Namespace).Patch(
+		ctx, pro.Name, types.MergePatchType, patchBytes, v1.PatchOptions{})
 	return err
 }
 
 func (pro *PipelineRunObject) GetResults() []Result {
 	res := []Result{}
-	for _, key := range pro.pr.Status.PipelineResults {
+	for _, key := range pro.Status.PipelineResults {
 		res = append(res, Result{
 			Name:  key.Name,
 			Value: key.Value,
@@ -188,5 +121,5 @@ func (pro *PipelineRunObject) GetResults() []Result {
 }
 
 func (pro *PipelineRunObject) GetServiceAccountName() string {
-	return pro.pr.Spec.ServiceAccountName
+	return pro.Spec.ServiceAccountName
 }

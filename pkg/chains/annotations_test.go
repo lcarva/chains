@@ -52,14 +52,14 @@ func TestReconciled(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := &v1beta1.TaskRun{
+			tro := objects.NewTaskRunObject(&v1beta1.TaskRun{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						ChainsAnnotation: tt.annotation,
 					},
 				},
-			}
-			got := Reconciled(tr)
+			})
+			got := Reconciled(tro)
 			if got != tt.want {
 				t.Errorf("Reconciled() got = %v, want %v", got, tt.want)
 			}
