@@ -75,6 +75,9 @@ func buildConfig(pr *v1beta1.PipelineRun, logger *zap.SugaredLogger) BuildConfig
 	}
 
 	pSpec := pr.Status.PipelineSpec
+	if pSpec == nil {
+		return BuildConfig{}
+	}
 	pipelineTasks := append(pSpec.Tasks, pSpec.Finally...)
 
 	var last string
