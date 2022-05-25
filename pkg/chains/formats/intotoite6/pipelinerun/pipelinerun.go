@@ -100,13 +100,16 @@ func buildConfig(pr *v1beta1.PipelineRun, logger *zap.SugaredLogger) BuildConfig
 		task := TaskAttestation{
 			Name:       trStatus.PipelineTaskName,
 			After:      after,
-			Ref:        *tr.TaskRef,
 			StartedOn:  trStatus.Status.StartTime.Time,
 			FinishedOn: trStatus.Status.CompletionTime.Time,
 			Status:     getStatus(trStatus.Status.Conditions),
 			Steps:      steps,
 			Invocation: util.AttestInvocation(params, paramSpecs, logger),
 			Results:    trStatus.Status.TaskRunResults,
+		}
+
+		if tr.TaskRef != nil {
+			task.Ref = *tr.TaskRef
 		}
 
 		tasks = append(tasks, task)
