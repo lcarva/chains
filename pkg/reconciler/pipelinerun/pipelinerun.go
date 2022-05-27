@@ -48,7 +48,7 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, pr *v1beta1.PipelineRun)
 // that we see flowing through the system.  If we don't add a finalizer, it could
 // get cleaned up before we see the final state and sign it.
 func (r *Reconciler) FinalizeKind(ctx context.Context, pr *v1beta1.PipelineRun) pkgreconciler.Event {
-	// Check to make sure the TaskRun is finished.
+	// Check to make sure the PipelineRun is finished.
 	if !pr.IsDone() {
 		logging.FromContext(ctx).Infof("pipelinerun %s/%s is still running", pr.Namespace, pr.Name)
 		return nil
@@ -59,6 +59,18 @@ func (r *Reconciler) FinalizeKind(ctx context.Context, pr *v1beta1.PipelineRun) 
 	if signing.Reconciled(pro) {
 		logging.FromContext(ctx).Infof("pipelinerun %s/%s has been reconciled", pr.Namespace, pr.Name)
 		return nil
+	}
+
+	// TaskRuns within a PipelineRun may not have been finalized yet if the PipelineRun timeout
+	// has exceeded. Wait to process the PipelineRun on the next update, see
+	// https://github.com/tektoncd/pipeline/issues/4916
+	for _, tr := range pr.Status.TaskRuns {
+		if tr.Status == nil || tr.Status.CompletionTime == nil {
+			logging.FromContext(ctx).Infof(
+				"taskrun %s within pipelinerun %s/%s is not yet finalized",
+				tr.PipelineTaskName, pr.Namespace, pr.Name)
+			return nil
+		}
 	}
 
 	if err := r.PipelineRunSigner.Sign(ctx, pro); err != nil {
